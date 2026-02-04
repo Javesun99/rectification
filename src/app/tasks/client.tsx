@@ -161,13 +161,13 @@ export default function TasksContent() {
                 }
                 // Prioritize 'text' field for title, fallback to 'fixed'
                 // This logic can be adjusted based on actual data structure preferences
-                const titleKey = Object.keys(config).find(k => config[k] === 'text') ||
-                                 Object.keys(config).find(k => config[k] === 'fixed');
+                const titleKey = Object.keys(config).find(k => String(config[k]).startsWith('text')) ||
+                                 Object.keys(config).find(k => String(config[k]).startsWith('fixed'));
                 const title = titleKey ? ref[titleKey] : `任务 #${task.id}`;
 
                 // Separate fixed info to display in body
-                const fixedInfo = Object.entries(ref).filter(([k]) => config[k] === 'fixed');
-                const otherInfo = Object.entries(ref).filter(([k]) => config[k] !== 'fixed' && k !== titleKey);
+                const fixedInfo = Object.entries(ref).filter(([k]) => String(config[k]).startsWith('fixed'));
+                const otherInfo = Object.entries(ref).filter(([k]) => !String(config[k]).startsWith('fixed') && k !== titleKey);
 
                 return (
                     <Card key={task.id} className={`overflow-hidden transition-all hover:shadow-md ${task.status === 'submitted' ? 'border-green-200 bg-green-50/30' : ''}`}>

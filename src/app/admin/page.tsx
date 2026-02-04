@@ -296,7 +296,7 @@ export default function AdminPage() {
       // Validate required fields (optional enhancement: you can define which fields are strictly required)
       // For now, we allow empty fields unless specific logic is needed.
       // If user wants to enforce "County" is present:
-      const countyKey = Object.keys(config).find(key => config[key] === 'county');
+      const countyKey = Object.keys(config).find(key => String(config[key]).startsWith('county'));
       if (countyKey && !newTaskData[countyKey]) {
         if (!window.confirm(`"${countyKey}" (权限字段) 为空，确定要创建吗？这可能导致该任务无法被正确分配。`)) {
           return;
@@ -450,7 +450,7 @@ export default function AdminPage() {
     if (batches.some(b => b.name === batchName)) {
         return alert('任务批次名称已存在，请使用其他名称');
     }
-    if (!Object.values(mapping).includes('county')) {
+    if (!Object.values(mapping).some(v => v.startsWith('county'))) {
       return alert('请指定哪一列是“县市/权限范围” (County)');
     }
 
@@ -692,8 +692,16 @@ export default function AdminPage() {
                         <span className="text-sm font-medium truncate" title={header}>{header}</span>
                         <select
                             className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                            value={mapping[header] || ''}
-                            onChange={(e) => setMapping(prev => ({ ...prev, [header]: e.target.value }))}
+                            value={mapping[header] ? mapping[header].split('|')[0] : ''}
+                            onChange={(e) => {
+                                const newType = e.target.value;
+                                const current = mapping[header] || '';
+                                const isRequired = current.includes('|required');
+                                setMapping(prev => ({
+                                    ...prev,
+                                    [header]: newType + (isRequired && ['text', 'image', 'date'].includes(newType) ? '|required' : '')
+                                }));
+                            }}
                         >
                             <option value="">(忽略/仅展示)</option>
                             <option value="fixed">固定展示信息 (Fixed Display)</option>
@@ -702,6 +710,26 @@ export default function AdminPage() {
                             <option value="image">图片上传 (Image Upload)</option>
                             <option value="date">日期选择 (Date Input)</option>
                         </select>
+
+                        {/* Required Checkbox */}
+                        {['text', 'image', 'date'].includes(mapping[header]?.split('|')[0]) && (
+                            <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+                                <input
+                                    type="checkbox"
+                                    className="rounded border-gray-300 text-primary focus:ring-primary"
+                                    checked={mapping[header]?.includes('|required')}
+                                    onChange={(e) => {
+                                        const baseType = mapping[header].split('|')[0];
+                                        if (e.target.checked) {
+                                            setMapping(prev => ({ ...prev, [header]: baseType + '|required' }));
+                                        } else {
+                                            setMapping(prev => ({ ...prev, [header]: baseType }));
+                                        }
+                                    }}
+                                />
+                                <span className="text-red-500 font-medium">必填</span>
+                            </label>
+                        )}
                         </div>
                     ))}
                     </div>
@@ -1021,11 +1049,13 @@ export default function AdminPage() {
                             return (
                                 <div className="space-y-4 border p-4 rounded-md">
                                     {Object.keys(config).map(key => {
-                                        const isCounty = config[key] === 'county';
+                                        const typeStr = String(config[key]);
+                                        const isCounty = typeStr.startsWith('county');
+                                        const baseType = typeStr.split('|')[0];
                                         return (
                                             <div key={key}>
                                                 <label className="text-sm font-medium flex items-center gap-1">
-                                                    {key} ({config[key]})
+                                                    {key} ({baseType})
                                                     {isCounty && <span className="text-red-500 text-xs">* (权限必填)</span>}
                                                 </label>
                                                 <input

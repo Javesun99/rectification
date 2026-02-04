@@ -20,7 +20,7 @@ export async function POST(request: Request) {
     }
 
     // Find which key maps to 'county'
-    const countyKey = Object.keys(mapping).find(key => mapping[key] === 'county');
+    const countyKey = Object.keys(mapping).find(key => mapping[key].startsWith('county'));
     if (!countyKey) {
       return NextResponse.json({ error: 'Must map a column to County/Permission Scope' }, { status: 400 });
     }

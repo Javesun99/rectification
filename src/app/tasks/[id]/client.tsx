@@ -59,6 +59,22 @@ export default function TaskDetailContent({ id }: { id: string }) {
 
   const handleSubmit = async () => {
     try {
+      const config = JSON.parse(task.batch.config_json);
+      // Validation
+      const errors: string[] = [];
+      Object.entries(config).forEach(([key, typeStr]) => {
+          const tStr = String(typeStr);
+          if (tStr.includes('|required')) {
+              if (!formData[key] || String(formData[key]).trim() === '') {
+                  errors.push(`"${key}" 是必填项`);
+              }
+          }
+      });
+
+      if (errors.length > 0) {
+          return alert(`提交失败，请检查以下问题：\n${errors.join('\n')}`);
+      }
+
       const res = await fetch(`/api/tasks/${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -106,13 +122,18 @@ export default function TaskDetailContent({ id }: { id: string }) {
             <CardContent className="space-y-6">
                 {Object.entries(config).map(([key, type]) => {
                     const value = ref[key];
-                    const valType = type as string;
+                    const fullType = type as string;
+                    const valType = fullType.split('|')[0];
+                    const isRequired = fullType.includes('|required');
 
                     if (valType === 'county') return null; // Hide permission field
 
                     return (
                         <div key={key} className="space-y-2">
-                            <label className="text-sm font-medium">{key}</label>
+                            <label className="text-sm font-medium flex items-center gap-1">
+                                {key}
+                                {isRequired && <span className="text-red-500">*</span>}
+                            </label>
 
                             {valType === 'fixed' && (
                                 <div className="p-2 bg-muted rounded-md text-sm">{value}</div>
