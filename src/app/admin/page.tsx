@@ -371,11 +371,56 @@ export default function AdminPage() {
 
     if (jsonData.length > 0) {
       const headerRow = jsonData[0];
-      const headers = headerRow.map((h: any, i: number) => (h !== undefined && h !== null && String(h).trim() !== '') ? String(h) : `未命名列_${i + 1}`);
+      const rawHeaders = headerRow.map((h: any, i: number) => (h !== undefined && h !== null && String(h).trim() !== '') ? String(h) : `未命名列_${i + 1}`);
 
-      const jsonDataObjs = jsonData.slice(1).map(row => {
+      // 检查是否存在重复列名
+      const counts = new Map<string, number>();
+      rawHeaders.forEach((h: string) => counts.set(h, (counts.get(h) || 0) + 1));
+      const hasDuplicates = Array.from(counts.values()).some(c => c > 1);
+
+      let headers: string[] = [];
+      let dataStartIndex = 1;
+
+      // 如果有重复，且存在第二行，尝试用第二行解决冲突
+      if (hasDuplicates && jsonData.length > 1) {
+          const subHeaderRow = jsonData[1];
+          // 解析第二行表头
+          const secondRowHeaders = subHeaderRow.map((h: any) => (h !== undefined && h !== null && String(h).trim() !== '') ? String(h) : '');
+
+          headers = rawHeaders.map((h: string, i: number) => {
+              if (counts.get(h)! > 1) {
+                  // 如果该列在第一行重复，则优先使用第二行的值
+                  // 如果第二行也是空的，则保留第一行原值（后续再去重）
+                  const subH = secondRowHeaders[i];
+                  return subH || h;
+              }
+              return h;
+          });
+
+          // 既然用到了第二行作为表头信息，数据应当从第三行开始
+          dataStartIndex = 2;
+      } else {
+          headers = rawHeaders;
+      }
+
+      // 再次去重（保底策略，防止第二行也重复或与第一行其他列冲突）
+      const finalHeaders: string[] = [];
+      const seen = new Map<string, number>();
+
+      headers.forEach((h: string) => {
+        if (seen.has(h)) {
+            const count = seen.get(h)! + 1;
+            seen.set(h, count);
+            finalHeaders.push(`${h}_${count}`);
+        } else {
+            seen.set(h, 1);
+            finalHeaders.push(h);
+        }
+      });
+
+      const jsonDataObjs = jsonData.slice(dataStartIndex).map(row => {
         const obj: Record<string, any> = {};
-        headers.forEach((header: string, index: number) => {
+        finalHeaders.forEach((header: string, index: number) => {
           // row is array of values
           const val = (row as any[])[index];
           obj[header] = val;
