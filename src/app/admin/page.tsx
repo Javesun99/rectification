@@ -21,6 +21,11 @@ export default function AdminPage() {
   const [selectedSheet, setSelectedSheet] = useState<string>('');
   const [workbook, setWorkbook] = useState<ExcelJS.Workbook | null>(null);
 
+  // Append Task State
+  const [isAppendMode, setIsAppendMode] = useState(false);
+  const [targetBatchId, setTargetBatchId] = useState<string>('');
+  const [uniqueKey, setUniqueKey] = useState<string>('');
+
   // Manage State
   const [tasks, setTasks] = useState<any[]>([]);
   const [batches, setBatches] = useState<any[]>([]);
@@ -104,6 +109,21 @@ export default function AdminPage() {
     }
     // Users tab fetching is handled by its own useEffect
   }, [activeTab, router]);
+
+  // Auto-fill mapping in Append Mode
+  useEffect(() => {
+    if (isAppendMode && targetBatchId) {
+      const targetBatch = batches.find(b => String(b.id) === targetBatchId);
+      if (targetBatch && targetBatch.config_json) {
+        try {
+          const config = JSON.parse(targetBatch.config_json);
+          setMapping(config);
+        } catch (e) {
+          console.error('Failed to parse target batch config', e);
+        }
+      }
+    }
+  }, [isAppendMode, targetBatchId, batches, headers]);
 
   const handleExport = async (batchId?: string) => {
     setExportLoading(true);
@@ -471,29 +491,55 @@ export default function AdminPage() {
   };
 
   const handleImport = async () => {
-    if (!batchName) return alert('Please enter a batch name');
-    if (batches.some(b => b.name === batchName)) {
+    if (!isAppendMode && !batchName) return alert('Please enter a batch name');
+    if (isAppendMode && !targetBatchId) return alert('请选择要追加的任务批次');
+    if (isAppendMode && !uniqueKey) return alert('请选择用于去重的唯一列');
+
+    if (!isAppendMode && batches.some(b => b.name === batchName)) {
         return alert('任务批次名称已存在，请使用其他名称');
     }
+    
+    // In append mode, we don't strictly require county mapping if we reuse existing config,
+    // but here we are re-mapping or validating against existing config.
+    // For simplicity, let's assume user must map 'county' again or we validate it matches target batch.
     if (!Object.values(mapping).some(v => v.startsWith('county'))) {
       return alert('请指定哪一列是“县市/权限范围” (County)');
     }
 
     setLoading(true);
     try {
+      const payload: any = {
+        mapping,
+        data,
+        isAppend: isAppendMode
+      };
+
+      if (isAppendMode) {
+        payload.batchId = targetBatchId;
+        payload.uniqueKey = uniqueKey;
+      } else {
+        payload.name = batchName;
+      }
+
       const res = await fetch('/api/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: batchName, mapping, data }),
+        body: JSON.stringify(payload),
       });
       const result = await res.json();
       if (result.success) {
-        alert(`导入成功！共 ${result.count} 条任务。`);
+        alert(isAppendMode 
+          ? `追加成功！新增 ${result.count} 条任务 (已跳过 ${result.skipped} 条重复任务)。`
+          : `导入成功！共 ${result.count} 条任务。`
+        );
         setFile(null);
         setHeaders([]);
         setData([]);
         setMapping({});
         setBatchName('');
+        setIsAppendMode(false);
+        setTargetBatchId('');
+        setUniqueKey('');
         fetchBatches();
       } else {
         alert('Error: ' + result.error);
@@ -704,67 +750,159 @@ export default function AdminPage() {
 
             {headers.length > 0 && (
                 <div className="space-y-4">
-                <div>
-                    <label className="text-sm font-medium">任务批次名称</label>
-                    <input
-                    value={batchName}
-                    onChange={e => setBatchName(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
-                    />
+                
+                {/* Mode Selection */}
+                <div className="flex items-center gap-4 bg-muted/20 p-3 rounded-md">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                            type="radio" 
+                            name="importMode" 
+                            checked={!isAppendMode} 
+                            onChange={() => setIsAppendMode(false)}
+                            className="text-primary focus:ring-primary"
+                        />
+                        <span className="font-medium">新建批次</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                        <input 
+                            type="radio" 
+                            name="importMode" 
+                            checked={isAppendMode} 
+                            onChange={() => setIsAppendMode(true)}
+                            className="text-primary focus:ring-primary"
+                        />
+                        <span className="font-medium">追加到现有批次</span>
+                    </label>
                 </div>
+
+                {!isAppendMode ? (
+                    <div>
+                        <label className="text-sm font-medium">任务批次名称</label>
+                        <input
+                        value={batchName}
+                        onChange={e => setBatchName(e.target.value)}
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+                        placeholder="例如: 2024年第一季度整改"
+                        />
+                    </div>
+                ) : (
+                    <div className="grid gap-4 md:grid-cols-2">
+                        <div>
+                            <label className="text-sm font-medium">选择目标批次</label>
+                            <select
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+                                value={targetBatchId}
+                                onChange={e => setTargetBatchId(e.target.value)}
+                            >
+                                <option value="">请选择...</option>
+                                {batches.map(b => (
+                                    <option key={b.id} value={b.id}>{b.name} (ID: {b.id})</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium">选择去重唯一列 (Unique Key)</label>
+                            <select
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+                                value={uniqueKey}
+                                onChange={e => setUniqueKey(e.target.value)}
+                            >
+                                <option value="">请选择...</option>
+                                {headers.map(h => (
+                                    <option key={h} value={h}>{h}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                系统将根据此列的值自动剔除目标批次中已存在的任务。
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 <div className="border rounded-md p-4 bg-muted/20">
                     <h3 className="font-semibold mb-4 flex items-center gap-2">
                     <FileSpreadsheet className="w-4 h-4" />
                     列属性映射
                     </h3>
-                    <div className="grid gap-4">
-                    {headers.map(header => (
-                        <div key={header} className="grid grid-cols-2 items-center gap-4">
-                        <span className="text-sm font-medium truncate" title={header}>{header}</span>
-                        <select
-                            className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                            value={mapping[header] ? mapping[header].split('|')[0] : ''}
-                            onChange={(e) => {
-                                const newType = e.target.value;
-                                const current = mapping[header] || '';
-                                const isRequired = current.includes('|required');
-                                setMapping(prev => ({
-                                    ...prev,
-                                    [header]: newType + (isRequired && ['text', 'image', 'date'].includes(newType) ? '|required' : '')
-                                }));
-                            }}
-                        >
-                            <option value="">(忽略/仅展示)</option>
-                            <option value="fixed">固定展示信息 (Fixed Display)</option>
-                            <option value="county">县市/权限范围 (County)</option>
-                            <option value="text">文字输入 (Text Input)</option>
-                            <option value="image">图片上传 (Image Upload)</option>
-                            <option value="date">日期选择 (Date Input)</option>
-                        </select>
-
-                        {/* Required Checkbox */}
-                        {['text', 'image', 'date'].includes(mapping[header]?.split('|')[0]) && (
-                            <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
-                                <input
-                                    type="checkbox"
-                                    className="rounded border-gray-300 text-primary focus:ring-primary"
-                                    checked={mapping[header]?.includes('|required')}
-                                    onChange={(e) => {
-                                        const baseType = mapping[header].split('|')[0];
-                                        if (e.target.checked) {
-                                            setMapping(prev => ({ ...prev, [header]: baseType + '|required' }));
-                                        } else {
-                                            setMapping(prev => ({ ...prev, [header]: baseType }));
-                                        }
-                                    }}
-                                />
-                                <span className="text-red-500 font-medium">必填</span>
-                            </label>
-                        )}
+                    {isAppendMode && targetBatchId ? (
+                        (() => {
+                            const targetBatch = batches.find(b => String(b.id) === targetBatchId);
+                            const config = targetBatch ? JSON.parse(targetBatch.config_json) : {};
+                            const configKeys = Object.keys(config);
+                            const missingHeaders = configKeys.filter(k => !headers.includes(k));
+                            
+                            return (
+                                <div className="space-y-4">
+                                    <div className="text-sm text-muted-foreground">
+                                        <p>追加模式下，列属性映射将自动与目标批次保持一致。</p>
+                                    </div>
+                                    
+                                    {missingHeaders.length > 0 ? (
+                                        <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded text-sm">
+                                            <strong>警告：</strong> 上传的 Excel 表头缺少目标批次所需的列：
+                                            <ul className="list-disc list-inside mt-1">
+                                                {missingHeaders.map(h => <li key={h}>{h}</li>)}
+                                            </ul>
+                                            <p className="mt-2">请调整 Excel 文件或选择正确的批次，否则导入可能失败或数据缺失。</p>
+                                        </div>
+                                    ) : (
+                                        <div className="bg-green-50 border border-green-200 text-green-700 p-3 rounded text-sm flex items-center gap-2">
+                                            <span className="text-xl">✓</span>
+                                            表头校验通过，已自动应用映射配置。
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()
+                    ) : (
+                        <div className="grid gap-4">
+                        {headers.map(header => (
+                            <div key={header} className="grid grid-cols-2 items-center gap-4">
+                            <span className="text-sm font-medium truncate" title={header}>{header}</span>
+                            <select
+                                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                value={mapping[header] ? mapping[header].split('|')[0] : ''}
+                                onChange={(e) => {
+                                    const newType = e.target.value;
+                                    const current = mapping[header] || '';
+                                    const isRequired = current.includes('|required');
+                                    setMapping(prev => ({
+                                        ...prev,
+                                        [header]: newType + (isRequired && ['text', 'image', 'date'].includes(newType) ? '|required' : '')
+                                    }));
+                                }}
+                            >
+                                <option value="">(忽略/仅展示)</option>
+                                <option value="fixed">固定展示信息 (Fixed Display)</option>
+                                <option value="county">县市/权限范围 (County)</option>
+                                <option value="text">文字输入 (Text Input)</option>
+                                <option value="image">图片上传 (Image Upload)</option>
+                                <option value="date">日期选择 (Date Input)</option>
+                            </select>
+    
+                            {/* Required Checkbox */}
+                            {['text', 'image', 'date'].includes(mapping[header]?.split('|')[0]) && (
+                                <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
+                                    <input
+                                        type="checkbox"
+                                        className="rounded border-gray-300 text-primary focus:ring-primary"
+                                        checked={mapping[header]?.includes('|required')}
+                                        onChange={(e) => {
+                                            const baseType = mapping[header].split('|')[0];
+                                            if (e.target.checked) {
+                                                setMapping(prev => ({ ...prev, [header]: baseType + '|required' }));
+                                            } else {
+                                                setMapping(prev => ({ ...prev, [header]: baseType }));
+                                            }
+                                        }}
+                                    />
+                                    <span className="text-red-500 font-medium">必填</span>
+                                </label>
+                            )}
+                            </div>
+                        ))}
                         </div>
-                    ))}
-                    </div>
+                    )}
                 </div>
 
                 <Button onClick={handleImport} disabled={loading} className="w-full">
