@@ -103,7 +103,8 @@ jobs:
           echo 'if [ ! -f "dev.db" ] && [ "$DATABASE_URL" = "file:./dev.db" ]; then' >> dist/app/start.sh
           echo '  echo "Database file not found. Attempting to initialize..."' >> dist/app/start.sh
           echo '  if command -v npx >/dev/null; then' >> dist/app/start.sh
-          echo '    npx prisma@5.22.0 db push' >> dist/app/start.sh
+          echo '    # Force use of Prisma 5.22.0 to match project dependency and avoid v7 breaking changes' >> dist/app/start.sh
+          echo '    npx -y prisma@5.22.0 db push' >> dist/app/start.sh
           echo '    node prisma/seed.js' >> dist/app/start.sh
           echo '  else' >> dist/app/start.sh
           echo '    echo "Warning: npx not found. Please manually initialize the database."' >> dist/app/start.sh
