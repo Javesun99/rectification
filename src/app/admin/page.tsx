@@ -37,16 +37,27 @@ export default function AdminPage() {
   const [users, setUsers] = useState<any[]>([]);
   // const [currentUser, setCurrentUser] = useState<any>(null); // Defined above or using context in real app
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem('user');
-    if (stored) {
-        try {
-            const u = JSON.parse(stored);
-            setCurrentUserRole(u.role || '');
-        } catch(e){}
-    }
+    // Fetch current user from server (cookie-based)
+    fetch('/api/auth/me')
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error('Unauthorized');
+      })
+      .then(data => {
+        if (data.user) {
+            setCurrentUser(data.user);
+            setCurrentUserRole(data.user.role || '');
+        }
+      })
+      .catch(() => {
+          // If fetch fails (401), middleware should have redirected, but just in case
+          // router.push('/login');
+      });
   }, []);
+  
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [newUserData, setNewUserData] = useState({ username: '', password: '', role: 'user', county: '' });
 
@@ -80,35 +91,14 @@ export default function AdminPage() {
   // Date Filter State
   const [dateFilter, setDateFilter] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const router = useRouter();
 
   useEffect(() => {
-    // Check admin auth
-    const userStr = localStorage.getItem('user');
-    if (!userStr) {
-      router.push('/login');
-      return;
-    }
-    try {
-      const user = JSON.parse(userStr);
-      // Allow both 'admin' and 'superadmin' to access the panel
-      if (user.role !== 'admin' && user.role !== 'superadmin') {
-        alert('无权访问管理员后台');
-        router.push('/login');
-        return;
-      }
-      setCurrentUser(user);
-    } catch (e) {
-      router.push('/login');
-      return;
-    }
-
+    // Check admin auth handled by middleware and fetch above
     if (activeTab === 'manage' || activeTab === 'import') {
       fetchBatches();
     }
-    // Users tab fetching is handled by its own useEffect
-  }, [activeTab, router]);
+  }, [activeTab]);
 
   // Auto-fill mapping in Append Mode
   useEffect(() => {
@@ -604,7 +594,8 @@ export default function AdminPage() {
                     variant="ghost"
                     size="sm"
                     className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8"
-                    onClick={() => {
+                    onClick={async () => {
+                        await fetch('/api/auth/logout', { method: 'POST' });
                         localStorage.removeItem('user');
                         router.push('/login');
                     }}

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { signToken } from '@/lib/auth';
+import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
@@ -14,12 +16,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '用户名或密码错误' }, { status: 401 });
     }
 
-    // In a real app, we would set a cookie/session here.
-    // For simplicity, we return user info to be stored in client state.
     const { password: _, ...userWithoutPassword } = user;
+    
+    // Generate JWT
+    const token = await signToken(userWithoutPassword);
 
-    return NextResponse.json({ user: userWithoutPassword });
+    // Set Cookie
+    const cookieStore = await cookies();
+    cookieStore.set('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24, // 1 day
+      path: '/',
+    });
+
+    return NextResponse.json({ success: true, user: userWithoutPassword });
   } catch (error) {
+    console.error('Login error:', error);
     return NextResponse.json({ error: 'Login failed' }, { status: 500 });
   }
 }

@@ -24,10 +24,13 @@ export default function LoginPage() {
       const data = await res.json();
 
       if (res.ok) {
-        // Save user info (in a real app, use secure cookies)
-        localStorage.setItem('user', JSON.stringify(data.user));
+        // Auth handled by HttpOnly cookie now.
+        // We still need role/county to decide where to redirect, which is in data.user
 
-        if (data.user.role === 'admin') {
+        // Remove old localStorage item if exists to avoid confusion
+        localStorage.removeItem('user');
+
+        if (data.user.role === 'admin' || data.user.role === 'superadmin') {
           router.push('/admin');
         } else {
           router.push(`/batches?county=${encodeURIComponent(data.user.county || '')}`);
