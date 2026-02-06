@@ -11,7 +11,17 @@ async function main() {
       role: 'admin',
     },
   })
-  console.log({ admin })
+
+  const superadmin = await prisma.user.upsert({
+    where: { username: 'superadmin' },
+    update: {},
+    create: {
+      username: 'superadmin',
+      password: 'superadmin', // In production, use hashed password
+      role: 'superadmin',
+    },
+  })
+  console.log({ admin, superadmin })
 }
 
 main()
