@@ -3,7 +3,7 @@ set -e
 
 # 自动同步数据库结构
 echo "Running database migrations..."
-npx prisma db push
+npx prisma@5.22.0 db push
 
 # 自动填充初始数据（seed.js 中使用了 upsert，所以是幂等的，可以重复运行）
 echo "Seeding database..."
