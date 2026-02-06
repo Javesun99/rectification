@@ -495,6 +495,17 @@ export default function AdminPage() {
     if (isAppendMode && !targetBatchId) return alert('请选择要追加的任务批次');
     if (isAppendMode && !uniqueKey) return alert('请选择用于去重的唯一列');
 
+    if (isAppendMode && targetBatchId) {
+        const targetBatch = batches.find(b => String(b.id) === targetBatchId);
+        const config = targetBatch ? JSON.parse(targetBatch.config_json) : {};
+        const configKeys = Object.keys(config);
+        const missingHeaders = configKeys.filter(k => !headers.includes(k));
+        
+        if (missingHeaders.length > 0) {
+            return alert(`表头校验失败！\n上传的 Excel 缺少以下必要列：\n${missingHeaders.join(', ')}\n\n请修改 Excel 后重新上传。`);
+        }
+    }
+
     if (!isAppendMode && batches.some(b => b.name === batchName)) {
         return alert('任务批次名称已存在，请使用其他名称');
     }

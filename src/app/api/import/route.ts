@@ -62,6 +62,19 @@ export async function POST(request: Request) {
         }, { status: 400 });
       }
 
+      // Check if data rows actually have the keys specified in config
+      if (data.length > 0) {
+        const firstRowKeys = Object.keys(data[0]);
+        const requiredKeys = Object.keys(config);
+        const missingDataKeys = requiredKeys.filter(k => !firstRowKeys.includes(k));
+        
+        if (missingDataKeys.length > 0) {
+           return NextResponse.json({ 
+             error: `上传的 Excel 数据列与原批次不匹配。缺少列: ${missingDataKeys.join(', ')}` 
+           }, { status: 400 });
+        }
+      }
+
       // Deduplication Logic
       const existingValues = new Set<string>();
       batch.tasks.forEach(task => {
