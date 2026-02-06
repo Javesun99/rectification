@@ -30,6 +30,18 @@ export default function AdminPage() {
 
   // User Management State
   const [users, setUsers] = useState<any[]>([]);
+  // const [currentUser, setCurrentUser] = useState<any>(null); // Defined above or using context in real app
+  const [currentUserRole, setCurrentUserRole] = useState<string>('');
+
+  useEffect(() => {
+    const stored = localStorage.getItem('user');
+    if (stored) {
+        try {
+            const u = JSON.parse(stored);
+            setCurrentUserRole(u.role || '');
+        } catch(e){}
+    }
+  }, []);
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [newUserData, setNewUserData] = useState({ username: '', password: '', role: 'user', county: '' });
 
@@ -75,7 +87,8 @@ export default function AdminPage() {
     }
     try {
       const user = JSON.parse(userStr);
-      if (user.role !== 'admin') {
+      // Allow both 'admin' and 'superadmin' to access the panel
+      if (user.role !== 'admin' && user.role !== 'superadmin') {
         alert('无权访问管理员后台');
         router.push('/login');
         return;
@@ -88,9 +101,8 @@ export default function AdminPage() {
 
     if (activeTab === 'manage' || activeTab === 'import') {
       fetchBatches();
-    } else if (activeTab === 'users') {
-      fetchUsers();
     }
+    // Users tab fetching is handled by its own useEffect
   }, [activeTab, router]);
 
   const handleExport = async (batchId?: string) => {
@@ -150,10 +162,23 @@ export default function AdminPage() {
   };
 
   const fetchUsers = async () => {
-    const res = await fetch('/api/admin/users');
-    const json = await res.json();
-    if (json.users) setUsers(json.users);
+    // Only superadmin can manage users
+    if (currentUserRole !== 'superadmin') return;
+
+    try {
+      const res = await fetch('/api/admin/users');
+      const data = await res.json();
+      setUsers(data.users || []);
+    } catch (error) {
+      console.error('Failed to fetch users', error);
+    }
   };
+
+  useEffect(() => {
+    if (activeTab === 'users' && currentUserRole === 'superadmin') {
+      fetchUsers();
+    }
+  }, [activeTab, currentUserRole]);
 
   const handleCreateUser = async () => {
     if (!newUserData.username || !newUserData.password) return alert('用户名和密码必填');
@@ -500,6 +525,8 @@ export default function AdminPage() {
             <Button
                 variant={activeTab === 'users' ? 'default' : 'outline'}
                 onClick={() => setActiveTab('users')}
+                disabled={currentUserRole !== 'superadmin'}
+                title={currentUserRole !== 'superadmin' ? '仅超级管理员可用' : ''}
             >
                 用户管理
             </Button>
@@ -574,6 +601,7 @@ export default function AdminPage() {
                                 >
                                     <option value="user">普通用户 (User)</option>
                                     <option value="admin">管理员 (Admin)</option>
+                                    <option value="superadmin">超级管理员 (Super Admin)</option>
                                 </select>
                             </div>
                             {newUserData.role === 'user' && (
@@ -614,7 +642,11 @@ export default function AdminPage() {
                                 <td className="p-4">{user.id}</td>
                                 <td className="p-4 font-medium">{user.username}</td>
                                 <td className="p-4">
-                                    <span className={`px-2 py-1 rounded text-xs ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                                    <span className={`px-2 py-1 rounded text-xs ${
+                                        user.role === 'superadmin' ? 'bg-red-100 text-red-800' :
+                                        user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                                        'bg-blue-100 text-blue-800'
+                                    }`}>
                                         {user.role}
                                     </span>
                                 </td>

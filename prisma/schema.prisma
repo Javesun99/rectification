@@ -12,7 +12,7 @@ model User {
   id        Int      @id @default(autoincrement())
   username  String   @unique
   password  String
-  role      String   @default("user") // "admin" or "user"
+  role      String   @default("user") // "superadmin", "admin" or "user"
   county    String?  // 绑定的县市，管理员可为空
   createdAt DateTime @default(now())
 }
