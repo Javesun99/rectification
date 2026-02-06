@@ -13,7 +13,7 @@ export default function BatchesContent() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
-  const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
+  const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const router = useRouter();
 
   useEffect(() => {
@@ -45,6 +45,7 @@ export default function BatchesContent() {
   }, [router]);
 
   const handleChangePassword = async () => {
+    if (!passwordData.oldPassword) return alert('请输入原密码');
     if (!passwordData.newPassword || !passwordData.confirmPassword) return alert('请输入密码');
     if (passwordData.newPassword !== passwordData.confirmPassword) return alert('两次输入密码不一致');
 
@@ -52,7 +53,10 @@ export default function BatchesContent() {
       const res = await fetch(`/api/admin/users/${currentUser.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: passwordData.newPassword })
+        body: JSON.stringify({ 
+          password: passwordData.newPassword,
+          oldPassword: passwordData.oldPassword 
+        })
       });
       const json = await res.json();
       if (json.success) {
@@ -141,6 +145,15 @@ export default function BatchesContent() {
                             <CardTitle>修改密码</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                            <div>
+                                <label className="text-sm font-medium">原密码</label>
+                                <input
+                                    type="password"
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+                                    value={passwordData.oldPassword}
+                                    onChange={e => setPasswordData({...passwordData, oldPassword: e.target.value})}
+                                />
+                            </div>
                             <div>
                                 <label className="text-sm font-medium">新密码</label>
                                 <input

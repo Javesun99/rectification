@@ -17,10 +17,18 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const body = await request.json();
-    const { password } = body;
+    const { password, oldPassword } = body;
 
     if (!password) {
       return NextResponse.json({ error: 'Password required' }, { status: 400 });
+    }
+
+    // Check old password if provided (for self-change)
+    if (oldPassword) {
+      const currentUser = await prisma.user.findUnique({ where: { id: Number(id) } });
+      if (!currentUser || currentUser.password !== oldPassword) {
+        return NextResponse.json({ error: '原密码错误' }, { status: 400 });
+      }
     }
 
     const user = await prisma.user.update({

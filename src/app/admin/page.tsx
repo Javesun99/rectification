@@ -63,7 +63,7 @@ export default function AdminPage() {
 
   // Password Management State
   const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
-  const [passwordData, setPasswordData] = useState({ newPassword: '', confirmPassword: '' });
+  const [passwordData, setPasswordData] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
   const [resetPasswordId, setResetPasswordId] = useState<number | null>(null);
   const [resetPasswordValue, setResetPasswordValue] = useState('');
 
@@ -217,14 +217,18 @@ export default function AdminPage() {
   };
 
   const handleChangePassword = async () => {
-    if (!passwordData.newPassword || !passwordData.confirmPassword) return alert('请输入密码');
-    if (passwordData.newPassword !== passwordData.confirmPassword) return alert('两次输入密码不一致');
+    if (!passwordData.oldPassword) return alert('请输入原密码');
+    if (!passwordData.newPassword || !passwordData.confirmPassword) return alert('请输入新密码');
+    if (passwordData.newPassword !== passwordData.confirmPassword) return alert('两次输入新密码不一致');
 
     try {
       const res = await fetch(`/api/admin/users/${currentUser.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: passwordData.newPassword })
+        body: JSON.stringify({ 
+          password: passwordData.newPassword,
+          oldPassword: passwordData.oldPassword 
+        })
       });
       const json = await res.json();
       if (json.success) {
@@ -615,6 +619,50 @@ export default function AdminPage() {
             </div>
         </div>
       </div>
+
+      {/* Change Password Modal - Moved outside of conditional tabs to be always accessible */}
+      {showChangePasswordModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+          <Card className="w-full max-w-sm">
+            <CardHeader>
+              <CardTitle>修改密码</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">原密码</label>
+                <input
+                  type="password"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+                  value={passwordData.oldPassword}
+                  onChange={e => setPasswordData({...passwordData, oldPassword: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">新密码</label>
+                <input
+                  type="password"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+                  value={passwordData.newPassword}
+                  onChange={e => setPasswordData({...passwordData, newPassword: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium">确认新密码</label>
+                <input
+                  type="password"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+                  value={passwordData.confirmPassword}
+                  onChange={e => setPasswordData({...passwordData, confirmPassword: e.target.value})}
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" onClick={() => setShowChangePasswordModal(false)}>取消</Button>
+                <Button onClick={handleChangePassword}>确认修改</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {activeTab === 'users' && (
         <div className="space-y-6">
@@ -1392,39 +1440,8 @@ export default function AdminPage() {
             )}
 
             {/* Change Password Modal */}
-            {showChangePasswordModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <Card className="w-full max-w-sm">
-                        <CardHeader>
-                            <CardTitle>修改密码</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <label className="text-sm font-medium">新密码</label>
-                                <input
-                                    type="password"
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
-                                    value={passwordData.newPassword}
-                                    onChange={e => setPasswordData({...passwordData, newPassword: e.target.value})}
-                                />
-                            </div>
-                            <div>
-                                <label className="text-sm font-medium">确认新密码</label>
-                                <input
-                                    type="password"
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
-                                    value={passwordData.confirmPassword}
-                                    onChange={e => setPasswordData({...passwordData, confirmPassword: e.target.value})}
-                                />
-                            </div>
-                            <div className="flex justify-end gap-2">
-                                <Button variant="ghost" onClick={() => setShowChangePasswordModal(false)}>取消</Button>
-                                <Button onClick={handleChangePassword}>确认修改</Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
+            {/* Moved to top level to be accessible from any tab */}
+            {/* {showChangePasswordModal && ( ... )} */}
 
             {/* Reset Password Modal */}
             {resetPasswordId && (
