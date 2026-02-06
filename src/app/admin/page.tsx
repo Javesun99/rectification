@@ -489,10 +489,20 @@ export default function AdminPage() {
         const targetBatch = batches.find(b => String(b.id) === targetBatchId);
         const config = targetBatch ? JSON.parse(targetBatch.config_json) : {};
         const configKeys = Object.keys(config);
-        const missingHeaders = configKeys.filter(k => !headers.includes(k));
+        
+        // Use mapping logic from import routine to handle potential duplicates or empty headers
+        // Simulating the header processing done in loadSheetData
+        const processedHeaders = headers; // Headers are already processed in loadSheetData
+
+        // Check if all config keys exist in the current headers
+        const missingHeaders = configKeys.filter(k => !processedHeaders.includes(k));
         
         if (missingHeaders.length > 0) {
-            return alert(`表头校验失败！\n上传的 Excel 缺少以下必要列：\n${missingHeaders.join(', ')}\n\n请修改 Excel 后重新上传。`);
+            // Check if missing headers are actually optional or system fields?
+            // Current requirement is strict match.
+            // However, sometimes ExcelJS might trim headers or handle them differently.
+            // Let's trust the 'headers' state which comes from loadSheetData.
+            return alert(`表头校验失败！\n上传的 Excel 缺少以下必要列：\n${missingHeaders.join(', ')}\n\n请确保 Excel 表头与原批次完全一致。`);
         }
     }
 

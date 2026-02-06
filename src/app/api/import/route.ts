@@ -64,15 +64,37 @@ export async function POST(request: Request) {
 
       // Check if data rows actually have the keys specified in config
       if (data.length > 0) {
+        // Use the first row to validate keys.
+        // NOTE: ExcelJS or frontend parsing might omit keys with undefined/null values in the first row.
+        // We should check if the keys exist in the 'mapping' (which comes from config)
+        // But 'mapping' is passed from frontend.
+        // The 'data' array objects might not have keys for empty cells.
+        
+        // Strategy: Iterate over all rows (or a sample) to see if keys are ever present?
+        // Better Strategy: The frontend sends 'data' as an array of objects.
+        // If a column is empty in a row, the key might be missing in that object.
+        // We should rely on the frontend validation of *Headers* which we just enforced.
+        // However, to be safe, we can check if the *Union* of all keys in data matches config?
+        // Or simply trust that if frontend passed header check, the data structure is correct 
+        // even if some specific cells are empty (missing keys in JSON).
+        
+        // Let's relax this check slightly: only check if keys are missing from *mapping* (which we validated against config).
+        // But we already did that with `missingKeys`.
+        
+        // The previous strict check `!firstRowKeys.includes(k)` fails if the first row has an empty cell for a required column.
+        // We should skip this data-level key check because `data` objects are sparse by default.
+        // The critical check is `missingKeys` (config vs mapping) and the Frontend Header check.
+        
+        /* 
         const firstRowKeys = Object.keys(data[0]);
         const requiredKeys = Object.keys(config);
         const missingDataKeys = requiredKeys.filter(k => !firstRowKeys.includes(k));
         
         if (missingDataKeys.length > 0) {
-           return NextResponse.json({ 
-             error: `上传的 Excel 数据列与原批次不匹配。缺少列: ${missingDataKeys.join(', ')}` 
-           }, { status: 400 });
+           // This is too strict for sparse data
+           // return NextResponse.json({ ... }); 
         }
+        */
       }
 
       // Deduplication Logic
