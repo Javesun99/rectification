@@ -18,6 +18,8 @@ RUN apk add --no-cache \
     && ln -sf /usr/bin/python3 /usr/bin/python
 # 复制 package.json 和 lock 文件
 COPY package.json package-lock.json ./
+# 复制启动脚本
+COPY docker-entrypoint.sh ./
 # 安装依赖
 RUN npm ci
 
@@ -79,5 +81,10 @@ USER nextjs
 
 EXPOSE 3000
 
-# 启动命令
+# 复制启动脚本
+COPY --from=builder --chown=nextjs:nodejs /app/docker-entrypoint.sh ./
+RUN chmod +x ./docker-entrypoint.sh
+
+# 使用自定义启动脚本
+ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "server.js"]
