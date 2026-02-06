@@ -80,21 +80,21 @@ jobs:
           mkdir -p dist
           # Create structure for packaging
           # The standalone folder needs specific files copied into it to be runnable
-          
+
           # 1. Base Standalone
           cp -r .next/standalone dist/app
-          
+
           # 2. Static files (Next.js requires these to be in .next/static)
           mkdir -p dist/app/.next/static
           cp -r .next/static/* dist/app/.next/static/
-          
+
           # 3. Public files
           mkdir -p dist/app/public
           cp -r public/* dist/app/public/
-          
+
           # 4. Copy Prisma Schema (Required for DB migrations)
           cp -r prisma dist/app/prisma
-          
+
           # 5. Create start script
           echo '#!/bin/sh' > dist/app/start.sh
           echo 'export DATABASE_URL=${DATABASE_URL:-"file:./dev.db"}' >> dist/app/start.sh
@@ -104,21 +104,24 @@ jobs:
           echo '  echo "Database file not found. Attempting to initialize..."' >> dist/app/start.sh
           echo '  if command -v npx >/dev/null; then' >> dist/app/start.sh
           echo '    # Force use of Prisma 5.22.0 to match project dependency and avoid v7 breaking changes' >> dist/app/start.sh
-          echo '    npx -y prisma@5.22.0 db push' >> dist/app/start.sh
+          echo '    # Use --skip-generate because the standalone app already has the generated client inside node_modules' >> dist/app/start.sh
+          echo '    # but missing the generator script itself (which is devDependency)' >> dist/app/start.sh
+          echo '    npx -y prisma@5.22.0 db push --skip-generate' >> dist/app/start.sh
           echo '    node prisma/seed.js' >> dist/app/start.sh
           echo '  else' >> dist/app/start.sh
+
           echo '    echo "Warning: npx not found. Please manually initialize the database."' >> dist/app/start.sh
 
           echo '  fi' >> dist/app/start.sh
           echo 'fi' >> dist/app/start.sh
           echo 'exec node server.js' >> dist/app/start.sh
           chmod +x dist/app/start.sh
-          
+
           # Create archive
           cd dist
           tar -czf ../rectification-system-standalone.tar.gz app
           cd ..
-          
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
