@@ -19,8 +19,7 @@ RUN apk add --no-cache \
 # 复制 package.json 和 lock 文件
 COPY package.json package-lock.json ./
 # 安装依赖
-# 设置环境变量跳过 prisma generate，因为此时 schema 文件还不存在
-RUN PRISMA_SKIP_POSTINSTALL_GENERATE=true npm ci
+RUN npm ci
 
 # 2. 构建阶段
 FROM node:20-alpine AS builder
