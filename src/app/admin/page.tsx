@@ -57,7 +57,7 @@ export default function AdminPage() {
           // router.push('/login');
       });
   }, []);
-  
+
   const [showAddUserModal, setShowAddUserModal] = useState(false);
   const [newUserData, setNewUserData] = useState({ username: '', password: '', role: 'user', county: '' });
 
@@ -77,6 +77,38 @@ export default function AdminPage() {
   // Rejection State
   const [rejectTaskId, setRejectTaskId] = useState<number | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+
+  // Task Edit State
+  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [editingSubmission, setEditingSubmission] = useState<Record<string, any>>({});
+
+  const handleUpdateTask = async () => {
+    if (!selectedTask) return;
+
+    try {
+      const res = await fetch(`/api/admin/tasks/${selectedTask.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          submission_json: JSON.stringify(editingSubmission)
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        alert('任务内容更新成功');
+        setIsEditingTask(false);
+        // Update local state
+        const updatedTask = { ...selectedTask, submission_json: JSON.stringify(editingSubmission) };
+        setSelectedTask(updatedTask);
+        // Update list state
+        setTasks(prev => prev.map(t => t.id === updatedTask.id ? updatedTask : t));
+      } else {
+        alert(json.error || '更新失败');
+      }
+    } catch (e) {
+      alert('更新失败');
+    }
+  };
 
   // Export State
   const [exportBatchId, setExportBatchId] = useState<string>('');
@@ -225,9 +257,9 @@ export default function AdminPage() {
       const res = await fetch(`/api/admin/users/${currentUser.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           password: passwordData.newPassword,
-          oldPassword: passwordData.oldPassword 
+          oldPassword: passwordData.oldPassword
         })
       });
       const json = await res.json();
@@ -493,14 +525,14 @@ export default function AdminPage() {
         const targetBatch = batches.find(b => String(b.id) === targetBatchId);
         const config = targetBatch ? JSON.parse(targetBatch.config_json) : {};
         const configKeys = Object.keys(config);
-        
+
         // Use mapping logic from import routine to handle potential duplicates or empty headers
         // Simulating the header processing done in loadSheetData
         const processedHeaders = headers; // Headers are already processed in loadSheetData
 
         // Check if all config keys exist in the current headers
         const missingHeaders = configKeys.filter(k => !processedHeaders.includes(k));
-        
+
         if (missingHeaders.length > 0) {
             // Check if missing headers are actually optional or system fields?
             // Current requirement is strict match.
@@ -513,7 +545,7 @@ export default function AdminPage() {
     if (!isAppendMode && batches.some(b => b.name === batchName)) {
         return alert('任务批次名称已存在，请使用其他名称');
     }
-    
+
     // In append mode, we don't strictly require county mapping if we reuse existing config,
     // but here we are re-mapping or validating against existing config.
     // For simplicity, let's assume user must map 'county' again or we validate it matches target batch.
@@ -543,7 +575,7 @@ export default function AdminPage() {
       });
       const result = await res.json();
       if (result.success) {
-        alert(isAppendMode 
+        alert(isAppendMode
           ? `追加成功！新增 ${result.count} 条任务 (已跳过 ${result.skipped} 条重复任务)。`
           : `导入成功！共 ${result.count} 条任务。`
         );
@@ -810,24 +842,24 @@ export default function AdminPage() {
 
             {headers.length > 0 && (
                 <div className="space-y-4">
-                
+
                 {/* Mode Selection */}
                 <div className="flex items-center gap-4 bg-muted/20 p-3 rounded-md">
                     <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                            type="radio" 
-                            name="importMode" 
-                            checked={!isAppendMode} 
+                        <input
+                            type="radio"
+                            name="importMode"
+                            checked={!isAppendMode}
                             onChange={() => setIsAppendMode(false)}
                             className="text-primary focus:ring-primary"
                         />
                         <span className="font-medium">新建批次</span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
-                        <input 
-                            type="radio" 
-                            name="importMode" 
-                            checked={isAppendMode} 
+                        <input
+                            type="radio"
+                            name="importMode"
+                            checked={isAppendMode}
                             onChange={() => setIsAppendMode(true)}
                             className="text-primary focus:ring-primary"
                         />
@@ -890,13 +922,13 @@ export default function AdminPage() {
                             const config = targetBatch ? JSON.parse(targetBatch.config_json) : {};
                             const configKeys = Object.keys(config);
                             const missingHeaders = configKeys.filter(k => !headers.includes(k));
-                            
+
                             return (
                                 <div className="space-y-4">
                                     <div className="text-sm text-muted-foreground">
                                         <p>追加模式下，列属性映射将自动与目标批次保持一致。</p>
                                     </div>
-                                    
+
                                     {missingHeaders.length > 0 ? (
                                         <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded text-sm">
                                             <strong>警告：</strong> 上传的 Excel 表头缺少目标批次所需的列：
@@ -939,7 +971,7 @@ export default function AdminPage() {
                                 <option value="image">图片上传 (Image Upload)</option>
                                 <option value="date">日期选择 (Date Input)</option>
                             </select>
-    
+
                             {/* Required Checkbox */}
                             {['text', 'image', 'date'].includes(mapping[header]?.split('|')[0]) && (
                                 <label className="flex items-center gap-2 text-sm cursor-pointer whitespace-nowrap">
@@ -1315,9 +1347,30 @@ export default function AdminPage() {
                     <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>任务详情 #{selectedTask.id}</CardTitle>
-                            <Button variant="ghost" size="icon" onClick={() => setSelectedTask(null)}>
-                                X
-                            </Button>
+                            <div className="flex gap-2">
+                                {(currentUserRole === 'admin' || currentUserRole === 'superadmin') && !isEditingTask && selectedTask.submission_json && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            try {
+                                                setEditingSubmission(JSON.parse(selectedTask.submission_json));
+                                                setIsEditingTask(true);
+                                            } catch(e) {
+                                                alert('无法解析提交数据，无法编辑');
+                                            }
+                                        }}
+                                    >
+                                        编辑内容
+                                    </Button>
+                                )}
+                                <Button variant="ghost" size="icon" onClick={() => {
+                                    setSelectedTask(null);
+                                    setIsEditingTask(false);
+                                }}>
+                                    X
+                                </Button>
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-6">
@@ -1342,7 +1395,41 @@ export default function AdminPage() {
 
                                 <div>
                                     <h3 className="font-semibold mb-2">提交信息 (Submission)</h3>
-                                    {selectedTask.submission_json ? (
+                                    {isEditingTask ? (
+                                        <div className="bg-blue-50/50 border border-blue-100 p-3 rounded-md text-sm space-y-4">
+                                            {Object.keys(editingSubmission).map(k => {
+                                                const v = editingSubmission[k];
+                                                const isImage = String(v).startsWith('data:image') || String(v).startsWith('http');
+                                                return (
+                                                    <div key={k}>
+                                                        <div className="font-medium text-blue-800 mb-1">{k}:</div>
+                                                        {isImage ? (
+                                                            <div className="space-y-2">
+                                                                <img src={String(v)} alt={k} className="max-h-40 rounded-md border" />
+                                                                <input
+                                                                    className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm"
+                                                                    value={String(v)}
+                                                                    onChange={e => setEditingSubmission(prev => ({...prev, [k]: e.target.value}))}
+                                                                    placeholder="图片链接..."
+                                                                />
+                                                                <p className="text-xs text-muted-foreground">修改图片链接或Base64字符串</p>
+                                                            </div>
+                                                        ) : (
+                                                            <textarea
+                                                                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                                                value={String(v)}
+                                                                onChange={e => setEditingSubmission(prev => ({...prev, [k]: e.target.value}))}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                );
+                                            })}
+                                            <div className="flex justify-end gap-2 pt-2">
+                                                <Button variant="ghost" onClick={() => setIsEditingTask(false)}>取消</Button>
+                                                <Button onClick={handleUpdateTask}>保存修改</Button>
+                                            </div>
+                                        </div>
+                                    ) : selectedTask.submission_json ? (
                                         <div className="bg-green-50/50 border border-green-100 p-3 rounded-md text-sm space-y-4">
                                             {(() => {
                                                 try {
