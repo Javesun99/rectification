@@ -17,17 +17,20 @@ export default function BatchesContent() {
   const router = useRouter();
 
   useEffect(() => {
-    // Check authentication
-    const userStr = localStorage.getItem('user');
-    if (!userStr) {
-      router.push('/login');
-      return;
-    }
-    try {
-      setCurrentUser(JSON.parse(userStr));
-    } catch (e) {
-      console.error(e);
-    }
+    // Check authentication via server
+    fetch('/api/auth/me')
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error('Unauthorized');
+      })
+      .then(data => {
+        if (data.user) {
+          setCurrentUser(data.user);
+        }
+      })
+      .catch(() => {
+        router.push('/login');
+      });
 
     fetch('/api/admin/batches')
       .then(res => res.json())
@@ -82,7 +85,8 @@ export default function BatchesContent() {
                 >
                     修改密码
                 </Button>
-                <Button variant="outline" onClick={() => {
+                <Button variant="outline" onClick={async () => {
+                    await fetch('/api/auth/logout', { method: 'POST' });
                     localStorage.removeItem('user');
                     router.push('/login');
                 }}>退出登录</Button>
