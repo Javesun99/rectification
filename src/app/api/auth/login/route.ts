@@ -25,7 +25,9 @@ export async function POST(request: Request) {
     const cookieStore = await cookies();
     cookieStore.set('token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
+      // If using HTTP (IP address), secure: true will block the cookie. 
+      // Only enable secure if explicitly using HTTPS or a specific env var.
+      secure: process.env.USE_HTTPS === 'true', 
       sameSite: 'lax',
       maxAge: 60 * 60 * 24, // 1 day
       path: '/',
