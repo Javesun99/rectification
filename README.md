@@ -102,6 +102,14 @@ docker run -d \
 ### 3. 访问系统
 访问 `http://服务器IP:3000` 即可。
 
+### 4. 关于 HTTPS 安全配置
+新代码兼容了“生产环境跑在内网 IP（无 SSL）”的常见情况。
+- **默认情况**：允许 HTTP 访问（`secure` Cookie 策略为 `false`）。
+- **启用 HTTPS**：如果您配置了域名和 HTTPS（反向代理），为了恢复最高安全性，请在启动命令中添加 `-e USE_HTTPS=true`。
+  ```bash
+  docker run -d ... -e USE_HTTPS=true ...
+  ```
+
 ---
 
 ## 📦 部署指南 (独立运行包 Standalone)
