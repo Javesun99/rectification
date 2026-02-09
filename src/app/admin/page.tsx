@@ -696,6 +696,36 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* Reset Password Modal - Global */}
+      {resetPasswordId && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+            <Card className="w-full max-w-sm">
+                <CardHeader>
+                    <CardTitle>重置密码</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <label className="text-sm font-medium">新密码</label>
+                        <input
+                            type="password"
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
+                            value={resetPasswordValue}
+                            onChange={e => setResetPasswordValue(e.target.value)}
+                            placeholder="请输入新密码"
+                        />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={() => {
+                            setResetPasswordId(null);
+                            setResetPasswordValue('');
+                        }}>取消</Button>
+                        <Button onClick={handleResetPassword}>确认重置</Button>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+      )}
+
       {activeTab === 'users' && (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -1531,35 +1561,7 @@ export default function AdminPage() {
             {/* Moved to top level to be accessible from any tab */}
             {/* {showChangePasswordModal && ( ... )} */}
 
-            {/* Reset Password Modal */}
-            {resetPasswordId && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <Card className="w-full max-w-sm">
-                        <CardHeader>
-                            <CardTitle>重置密码</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div>
-                                <label className="text-sm font-medium">新密码</label>
-                                <input
-                                    type="password"
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
-                                    value={resetPasswordValue}
-                                    onChange={e => setResetPasswordValue(e.target.value)}
-                                    placeholder="请输入新密码"
-                                />
-                            </div>
-                            <div className="flex justify-end gap-2">
-                                <Button variant="ghost" onClick={() => {
-                                    setResetPasswordId(null);
-                                    setResetPasswordValue('');
-                                }}>取消</Button>
-                                <Button onClick={handleResetPassword}>确认重置</Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
+            {/* Reset Password Modal - Moved to top level */}
         </div>
       )}
     </div>
