@@ -107,7 +107,10 @@ export default function BatchesContent() {
                     <Link key={batch.id} href={`/tasks?county=${encodeURIComponent(county)}&batchId=${batch.id}`}>
                         <Card className="hover:shadow-md transition-shadow cursor-pointer">
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-lg font-medium">{batch.name}</CardTitle>
+                                <div>
+                                    <CardTitle className="text-lg font-medium">{batch.name}</CardTitle>
+                                    <div className="text-xs text-muted-foreground mt-1">发布人: {batch.creatorName}</div>
+                                </div>
                                 <div className="text-sm text-muted-foreground">
                                     {new Date(batch.createdAt).toLocaleDateString()}
                                 </div>

@@ -37,6 +37,9 @@ export async function GET() {
     const batches = await prisma.importBatch.findMany({
       where: whereClause,
       include: {
+        creator: {
+          select: { username: true }
+        },
         tasks: {
           select: {
             county: true,
@@ -63,6 +66,7 @@ export async function GET() {
 
       return {
         ...batch,
+        creatorName: batch.creator?.username || 'Unknown (Legacy)',
         tasks: undefined, // Remove raw tasks to reduce payload
         stats: statsByCounty,
         totalTasks: batch.tasks.length

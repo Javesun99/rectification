@@ -1072,8 +1072,9 @@ export default function AdminPage() {
                                     </div>
                                 </CardHeader>
                                 <CardContent>
-                                    <div className="text-sm text-muted-foreground mb-4">
-                                        导入时间: {new Date(batch.createdAt).toLocaleString()} | 总任务数: {batch.totalTasks}
+                                    <div className="text-sm text-muted-foreground mb-4 flex flex-col gap-1">
+                                        <div>发布人: <span className="font-medium text-foreground">{batch.creatorName}</span></div>
+                                        <div>导入时间: {new Date(batch.createdAt).toLocaleString()} | 总任务数: {batch.totalTasks}</div>
                                     </div>
 
                                     {batch.stats && Object.keys(batch.stats).length > 0 ? (
