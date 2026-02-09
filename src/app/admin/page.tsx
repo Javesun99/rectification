@@ -731,6 +731,30 @@ export default function AdminPage() {
         </div>
       )}
 
+      {/* Delete Confirmation Modal - Global */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-sm">
+                <CardHeader>
+                    <CardTitle>确认删除</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <div className="mb-6 text-sm text-muted-foreground">
+                        {deleteConfirm.type === 'batch'
+                            ? '确定要删除该批次吗？这将永久删除该批次下的所有任务且无法恢复。'
+                            : deleteConfirm.type === 'user'
+                                ? '确定要删除该用户吗？此操作不可逆。'
+                                : '确定要删除该任务吗？此操作无法撤销。'}
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={() => setDeleteConfirm(null)}>取消</Button>
+                        <Button variant="destructive" onClick={executeDelete}>确认删除</Button>
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
+      )}
+
       {activeTab === 'users' && (
         <div className="space-y-6">
             <div className="flex justify-between items-center">
@@ -1540,29 +1564,7 @@ export default function AdminPage() {
                 </div>
             )}
 
-            {/* Delete Confirmation Modal */}
-            {deleteConfirm && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <Card className="w-full max-w-sm">
-                        <CardHeader>
-                            <CardTitle>确认删除</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="mb-6 text-sm text-muted-foreground">
-                                {deleteConfirm.type === 'batch'
-                                    ? '确定要删除该批次吗？这将永久删除该批次下的所有任务且无法恢复。'
-                                    : deleteConfirm.type === 'user'
-                                        ? '确定要删除该用户吗？此操作不可逆。'
-                                        : '确定要删除该任务吗？此操作无法撤销。'}
-                            </div>
-                            <div className="flex justify-end gap-2">
-                                <Button variant="ghost" onClick={() => setDeleteConfirm(null)}>取消</Button>
-                                <Button variant="destructive" onClick={executeDelete}>确认删除</Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
+            {/* Delete Confirmation Modal - Moved to top level */}
 
             {/* Change Password Modal */}
             {/* Moved to top level to be accessible from any tab */}
