@@ -18,11 +18,21 @@ export async function GET() {
     // Filter Logic:
     // Superadmin: See all
     // Admin: See only own batches (creatorId = userId)
-    // User: This API shouldn't be accessed by user, but if so, maybe empty? (Middleware protects /admin/*)
+    // User: See all batches (so they can see tasks assigned to them). 
+    //       Ideally, we should filter batches that actually contain tasks for this user's county?
+    //       But current frontend logic in /batches/client.tsx expects to see all batches and then filters stats by county.
+    //       So for now, let's allow 'user' role to see all batches (read-only).
     
-    const whereClause = userRole === 'superadmin' 
-      ? {} 
-      : { creatorId: userId };
+    let whereClause = {};
+
+    if (userRole === 'admin') {
+      whereClause = { creatorId: userId };
+    } else {
+      // superadmin OR user -> see all
+      // For user, maybe we want to restrict to only batches that have tasks for their county?
+      // But let's keep it simple for now to fix the visibility issue.
+      whereClause = {};
+    }
 
     const batches = await prisma.importBatch.findMany({
       where: whereClause,
