@@ -31,7 +31,7 @@ model ImportBatch {
   tasks     Task[]
   
   creatorId Int?
-  creator   User?    @relation(fields: [creatorId], references: [id])
+  creator   User?    @relation(fields: [creatorId], references: [id], onDelete: SetNull)
 }
 
 model Task {

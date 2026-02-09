@@ -348,8 +348,13 @@ export default function AdminPage() {
         await fetch(`/api/admin/tasks/${id}`, { method: 'DELETE' });
         setTasks(prev => prev.filter(t => t.id !== id));
       } else if (type === 'user') {
-        await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
-        setUsers(prev => prev.filter(u => u.id !== id));
+        const res = await fetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+        if (res.ok) {
+            setUsers(prev => prev.filter(u => u.id !== id));
+        } else {
+            const json = await res.json();
+            alert(json.error || '删除失败');
+        }
       }
     } catch (e) {
       alert('删除失败');
@@ -1546,7 +1551,9 @@ export default function AdminPage() {
                             <div className="mb-6 text-sm text-muted-foreground">
                                 {deleteConfirm.type === 'batch'
                                     ? '确定要删除该批次吗？这将永久删除该批次下的所有任务且无法恢复。'
-                                    : '确定要删除该任务吗？此操作无法撤销。'}
+                                    : deleteConfirm.type === 'user'
+                                        ? '确定要删除该用户吗？此操作不可逆。'
+                                        : '确定要删除该任务吗？此操作无法撤销。'}
                             </div>
                             <div className="flex justify-end gap-2">
                                 <Button variant="ghost" onClick={() => setDeleteConfirm(null)}>取消</Button>
