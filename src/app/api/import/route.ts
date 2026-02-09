@@ -1,8 +1,20 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { verifyToken } from '@/lib/auth';
+import { cookies } from 'next/headers';
 
 export async function POST(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    const user = token ? await verifyToken(token) : null;
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const userId = Number(user.id);
+    const userRole = (user as any).role;
+
     const body = await request.json();
     const { name, mapping, data, isAppend, batchId, uniqueKey } = body;
 
@@ -30,6 +42,20 @@ export async function POST(request: Request) {
 
       if (!batch) {
         return NextResponse.json({ error: 'Target batch not found' }, { status: 404 });
+      }
+
+      // Permission Check
+      // Superadmin can edit all.
+      // Admin can only edit their own (creatorId matches).
+      // For legacy batches (creatorId is null), we allow all admins (or maybe restrict to superadmin? Let's allow all for backward compatibility if desired, or restrict. 
+      // Given the requirement "only see their own", legacy batches (null) shouldn't be visible to them if we are strict.
+      // Let's assume strict ownership for new feature. Legacy batches will only be visible/editable by Superadmin unless we migrate them.
+      // But to avoid breaking existing workflow for admins, maybe legacy batches are "public" to admins?
+      // Let's stick to strict: If you didn't create it, you can't touch it. (Legacy batches -> Superadmin only).
+      if (userRole !== 'superadmin' && batch.creatorId !== userId) {
+         // Special case: If batch.creatorId is null, it's a legacy batch. 
+         // If we want to allow admins to claim them? No.
+         return NextResponse.json({ error: 'Permission denied: You do not own this batch' }, { status: 403 });
       }
 
       // Validate that new tasks conform to the original batch configuration
@@ -156,6 +182,7 @@ export async function POST(request: Request) {
       const batch = await prisma.importBatch.create({
         data: {
           name,
+          creatorId: userId,
           config_json: JSON.stringify(mapping),
           tasks: {
             create: data.map((row: any) => ({
