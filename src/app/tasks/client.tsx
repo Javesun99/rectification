@@ -159,15 +159,22 @@ export default function TasksContent() {
                 } catch (e) {
                     console.error('JSON Parse Error for task', task.id);
                 }
-                // Prioritize 'text' field for title, fallback to 'fixed'
-                // This logic can be adjusted based on actual data structure preferences
-                const titleKey = Object.keys(config).find(k => String(config[k]).startsWith('text')) ||
-                                 Object.keys(config).find(k => String(config[k]).startsWith('fixed'));
+                // Prioritize 'fixed' field for title, fallback to 'text'
+                // User requirement: "优先展示 固定展示内容" as title if possible, or just prioritize fixed in display logic.
+                // Assuming this means the main bold title should come from a fixed field if available.
+                const titleKey = Object.keys(config).find(k => String(config[k]).startsWith('fixed')) ||
+                                 Object.keys(config).find(k => String(config[k]).startsWith('text'));
                 const title = titleKey ? ref[titleKey] : `任务 #${task.id}`;
 
                 // Separate fixed info to display in body
-                const fixedInfo = Object.entries(ref).filter(([k]) => String(config[k]).startsWith('fixed'));
-                const otherInfo = Object.entries(ref).filter(([k]) => !String(config[k]).startsWith('fixed') && k !== titleKey);
+                const fixedInfo = Object.entries(ref).filter(([k]) => {
+                    const type = String(config[k]);
+                    return type.startsWith('fixed') || type.startsWith('prefill');
+                });
+                const otherInfo = Object.entries(ref).filter(([k]) => {
+                    const type = String(config[k]);
+                    return !type.startsWith('fixed') && !type.startsWith('prefill') && k !== titleKey;
+                });
 
                 return (
                     <Card key={task.id} className={`overflow-hidden transition-all hover:shadow-md ${task.status === 'submitted' ? 'border-green-200 bg-green-50/30' : ''}`}>

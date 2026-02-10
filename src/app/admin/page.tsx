@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import ExcelJS from 'exceljs';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Upload, FileSpreadsheet, Save, Trash2, Plus, RefreshCw } from 'lucide-react';
+import ImportConfig from '@/components/ImportConfig';
+import FormattedDate from '@/components/FormattedDate';
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<'import' | 'manage' | 'users' | 'logs'>('import');
@@ -17,9 +18,7 @@ export default function AdminPage() {
   const [mapping, setMapping] = useState<Record<string, string>>({});
   const [batchName, setBatchName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [sheetNames, setSheetNames] = useState<string[]>([]);
-  const [selectedSheet, setSelectedSheet] = useState<string>('');
-  const [workbook, setWorkbook] = useState<ExcelJS.Workbook | null>(null);
+  const [showImportConfig, setShowImportConfig] = useState(false);
 
   // Append Task State
   const [isAppendMode, setIsAppendMode] = useState(false);
@@ -35,7 +34,6 @@ export default function AdminPage() {
 
   // User Management State
   const [users, setUsers] = useState<any[]>([]);
-  // const [currentUser, setCurrentUser] = useState<any>(null); // Defined above or using context in real app
   const [currentUserRole, setCurrentUserRole] = useState<string>('');
   const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -425,120 +423,23 @@ export default function AdminPage() {
     }
   };
 
-  // ... (Existing Excel Import Logic: handleFileUpload, loadSheetData, handleSheetChange, handleImport) ...
+  // ... (Existing Excel Import Logic replaced by ImportConfig)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (!f) return;
     setFile(f);
     setBatchName(f.name.replace(/\.[^/.]+$/, ""));
-
-    const reader = new FileReader();
-    reader.onload = async (evt) => {
-      const buffer = evt.target?.result as ArrayBuffer;
-      const wb = new ExcelJS.Workbook();
-      await wb.xlsx.load(buffer);
-
-      setWorkbook(wb);
-      const sheets = wb.worksheets.map(ws => ws.name);
-      setSheetNames(sheets);
-
-      if (sheets.length > 0) {
-        setSelectedSheet(sheets[0]);
-        loadSheetData(wb, sheets[0]);
-      }
-    };
-    reader.readAsArrayBuffer(f);
+    setShowImportConfig(true);
+    // Reset previous parse results
+    setHeaders([]);
+    setData([]);
   };
 
-  const loadSheetData = (wb: ExcelJS.Workbook, sheetName: string) => {
-    const ws = wb.getWorksheet(sheetName);
-    if (!ws) return;
-
-    const jsonData: any[] = [];
-    ws.eachRow((row) => {
-      // row.values is 1-based array (index 0 is undefined/null)
-      let values = row.values;
-      if (Array.isArray(values)) {
-          // Remove the first empty element (ExcelJS quirk)
-          values = values.slice(1);
-      }
-      jsonData.push(values);
-    });
-
-    if (jsonData.length > 0) {
-      const headerRow = jsonData[0];
-      const rawHeaders = headerRow.map((h: any, i: number) => (h !== undefined && h !== null && String(h).trim() !== '') ? String(h) : `未命名列_${i + 1}`);
-
-      // 检查是否存在重复列名
-      const counts = new Map<string, number>();
-      rawHeaders.forEach((h: string) => counts.set(h, (counts.get(h) || 0) + 1));
-      const hasDuplicates = Array.from(counts.values()).some(c => c > 1);
-
-      let headers: string[] = [];
-      let dataStartIndex = 1;
-
-      // 如果有重复，且存在第二行，尝试用第二行解决冲突
-      if (hasDuplicates && jsonData.length > 1) {
-          const subHeaderRow = jsonData[1];
-          // 解析第二行表头
-          const secondRowHeaders = subHeaderRow.map((h: any) => (h !== undefined && h !== null && String(h).trim() !== '') ? String(h) : '');
-
-          headers = rawHeaders.map((h: string, i: number) => {
-              if (counts.get(h)! > 1) {
-                  // 如果该列在第一行重复，则优先使用第二行的值
-                  // 如果第二行也是空的，则保留第一行原值（后续再去重）
-                  const subH = secondRowHeaders[i];
-                  return subH || h;
-              }
-              return h;
-          });
-
-          // 既然用到了第二行作为表头信息，数据应当从第三行开始
-          dataStartIndex = 2;
-      } else {
-          headers = rawHeaders;
-      }
-
-      // 再次去重（保底策略，防止第二行也重复或与第一行其他列冲突）
-      const finalHeaders: string[] = [];
-      const seen = new Map<string, number>();
-
-      headers.forEach((h: string) => {
-        if (seen.has(h)) {
-            const count = seen.get(h)! + 1;
-            seen.set(h, count);
-            finalHeaders.push(`${h}_${count}`);
-        } else {
-            seen.set(h, 1);
-            finalHeaders.push(h);
-        }
-      });
-
-      const jsonDataObjs = jsonData.slice(dataStartIndex).map(row => {
-        const obj: Record<string, any> = {};
-        finalHeaders.forEach((header: string, index: number) => {
-          // row is array of values
-          const val = (row as any[])[index];
-          obj[header] = val;
-        });
-        return obj;
-      });
-
-      setHeaders(headers);
-      setData(jsonDataObjs);
-      setMapping({});
-    } else {
-      setHeaders([]);
-      setData([]);
-    }
-  };
-
-  const handleSheetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const sheetName = e.target.value;
-    setSelectedSheet(sheetName);
-    if (workbook) {
-      loadSheetData(workbook, sheetName);
-    }
+  const handleParsedData = (parsedHeaders: string[], parsedData: any[]) => {
+    setHeaders(parsedHeaders);
+    setData(parsedData);
+    setMapping({});
+    setShowImportConfig(false);
   };
 
   const handleImport = async () => {
@@ -886,7 +787,7 @@ export default function AdminPage() {
                                     </span>
                                 </td>
                                 <td className="p-4">{user.county || '-'}</td>
-                                <td className="p-4">{new Date(user.createdAt).toLocaleDateString()}</td>
+                                <td className="p-4"><FormattedDate date={user.createdAt} mode="date" /></td>
                                 <td className="p-4">
                                     <Button variant="outline" size="sm" className="mr-2" onClick={() => setResetPasswordId(user.id)}>
                                         重置密码
@@ -940,7 +841,7 @@ export default function AdminPage() {
                                 <td className="p-4 text-xs text-muted-foreground max-w-[200px] truncate" title={log.userAgent}>
                                     {log.userAgent}
                                 </td>
-                                <td className="p-4">{new Date(log.loginAt).toLocaleString()}</td>
+                                <td className="p-4"><FormattedDate date={log.loginAt} /></td>
                             </tr>
                         ))}
                         {logs.length === 0 && (
@@ -973,22 +874,19 @@ export default function AdminPage() {
                 />
             </div>
 
-            {sheetNames.length > 0 && (
-                <div className="mb-4">
-                <label className="text-sm font-medium">选择工作表 (Sheet)</label>
-                <select
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
-                    value={selectedSheet}
-                    onChange={handleSheetChange}
-                >
-                    {sheetNames.map(name => (
-                    <option key={name} value={name}>{name}</option>
-                    ))}
-                </select>
-                </div>
+            {/* Import Config Wizard */}
+            {showImportConfig && file && (
+                <ImportConfig
+                    file={file}
+                    onParsed={handleParsedData}
+                    onCancel={() => {
+                        setFile(null);
+                        setShowImportConfig(false);
+                    }}
+                />
             )}
 
-            {headers.length > 0 && (
+            {headers.length > 0 && !showImportConfig && (
                 <div className="space-y-4">
 
                 {/* Mode Selection */}
@@ -1118,6 +1016,7 @@ export default function AdminPage() {
                                 <option value="text">文字输入 (Text Input)</option>
                                 <option value="image">图片上传 (Image Upload)</option>
                                 <option value="date">日期选择 (Date Input)</option>
+                                <option value="prefill">预填信息 (Pre-filled Info)</option>
                             </select>
 
                             {/* Required Checkbox */}
@@ -1222,7 +1121,9 @@ export default function AdminPage() {
                                 <CardContent>
                                     <div className="text-sm text-muted-foreground mb-4 flex flex-col gap-1">
                                         <div>发布人: <span className="font-medium text-foreground">{batch.creatorName}</span></div>
-                                        <div>导入时间: {new Date(batch.createdAt).toLocaleString()} | 总任务数: {batch.totalTasks}</div>
+                                        <div className="flex items-center gap-1">
+                                            导入时间: <FormattedDate date={batch.createdAt} /> | 总任务数: {batch.totalTasks}
+                                        </div>
                                     </div>
 
                                     {batch.stats && Object.keys(batch.stats).length > 0 ? (
@@ -1402,7 +1303,7 @@ export default function AdminPage() {
                                                 </span>
                                                 {task.submittedAt && (
                                                     <div className="text-[10px] text-muted-foreground mt-1">
-                                                        {new Date(task.submittedAt).toLocaleDateString()}
+                                                        <FormattedDate date={task.submittedAt} mode="date" />
                                                     </div>
                                                 )}
                                             </td>

@@ -17,10 +17,46 @@ export default function TaskDetailContent({ id }: { id: string }) {
       .then(res => res.json())
       .then(data => {
         if (data.task) {
-          setTask(data.task);
-          if (data.task.submission_json) {
-            setFormData(JSON.parse(data.task.submission_json));
+          const t = data.task;
+          setTask(t);
+          let initial: Record<string, any> = {};
+          // Load existing submission if present
+          if (t.submission_json) {
+            try {
+              initial = JSON.parse(t.submission_json);
+            } catch {}
           }
+          // Hydrate prefill fields from reference data when no submission value exists
+          try {
+            const config = JSON.parse(t.batch.config_json || '{}');
+            const ref = JSON.parse(t.reference_json || '{}');
+            Object.entries(config).forEach(([key, typeStr]) => {
+              const baseType = String(typeStr).split('|')[0];
+              if (baseType === 'prefill') {
+                const current = initial[key];
+                const isEmpty =
+                  current === undefined ||
+                  current === null ||
+                  (typeof current === 'string' && current.trim() === '');
+                if (isEmpty) {
+                  // Bug Fix: Check if ref has the value, or try fuzzy matching key
+                  let val = ref[key];
+                  if (val === undefined || val === null) {
+                      const normalizedHeader = key.trim().toLowerCase();
+                      const actualKey = Object.keys(ref).find(k => k.trim().toLowerCase() === normalizedHeader);
+                      if (actualKey) val = ref[actualKey];
+                  }
+
+                  if (val !== undefined && val !== null) {
+                      initial[key] = val;
+                  }
+                }
+              }
+            });
+          } catch (e) {
+              console.error('Error hydrating prefill data', e);
+          }
+          setFormData(initial);
         }
         setLoading(false);
       });
@@ -128,6 +164,34 @@ export default function TaskDetailContent({ id }: { id: string }) {
 
                     if (valType === 'county') return null; // Hide permission field
 
+                    // Handle 'prefill' type: treat as text input but with initial value from reference if not yet edited
+                    // Wait, prefill data is already loaded into 'formData' in useEffect if submission_json exists.
+                    // If submission_json is null (pending task), we should probably populate formData with the prefill value?
+                    // But 'prefill' means the value comes from the IMPORTED row (reference_json), not user input.
+                    // Actually, our backend logic puts the prefilled value into 'submission_json' directly during import.
+                    // So 'formData' will already have it.
+                    // We just need to decide: is 'prefill' editable?
+                    // User requirement: "如果是需要输入的...". This implies it might be editable or just info.
+                    // Usually 'prefill' means "Default Value".
+                    // Let's render it as a text input so user can modify if needed.
+
+                    if (valType === 'prefill' || valType === 'text') {
+                        return (
+                            <div key={key} className="space-y-2">
+                                <label className="text-sm font-medium flex items-center gap-1">
+                                    {key}
+                                    {isRequired && <span className="text-red-500">*</span>}
+                                </label>
+                                <input
+                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                    value={formData[key] || ''}
+                                    onChange={e => setFormData({...formData, [key]: e.target.value})}
+                                    placeholder={valType === 'prefill' ? '（已预填，可修改）' : `请输入${key}`}
+                                />
+                            </div>
+                        );
+                    }
+
                     return (
                         <div key={key} className="space-y-2">
                             <label className="text-sm font-medium flex items-center gap-1">
@@ -139,14 +203,7 @@ export default function TaskDetailContent({ id }: { id: string }) {
                                 <div className="p-2 bg-muted rounded-md text-sm">{value}</div>
                             )}
 
-                            {valType === 'text' && (
-                                <input
-                                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                    value={formData[key] || ''}
-                                    onChange={e => setFormData({...formData, [key]: e.target.value})}
-                                    placeholder={`请输入${key}`}
-                                />
-                            )}
+
 
                             {valType === 'date' && (
                                 <input
