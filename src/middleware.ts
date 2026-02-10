@@ -23,7 +23,7 @@ export async function middleware(request: NextRequest) {
 
     // Role-based protection for /admin
     if (pathname.startsWith('/admin')) {
-      const role = (payload as any).role;
+      const role = payload.role;
       if (role !== 'admin' && role !== 'superadmin') {
         // Redirect regular users to their dashboard if they try to access admin
         // Or show a 403 page. Here we redirect to batches.

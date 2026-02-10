@@ -34,9 +34,11 @@ export async function POST(request: Request) {
       if (!batchId || !uniqueKey) {
         return NextResponse.json({ error: 'Batch ID and Unique Key required for append mode' }, { status: 400 });
       }
+      
+      const targetBatchIdNum = Number(batchId);
 
       const batch = await prisma.importBatch.findUnique({
-        where: { id: Number(batchId) },
+        where: { id: targetBatchIdNum },
         include: { tasks: true }
       });
 
@@ -119,9 +121,14 @@ export async function POST(request: Request) {
       });
 
       if (newTasks.length > 0) {
-        await prisma.task.createMany({
-          data: newTasks
-        });
+        // Create in chunks
+        const BATCH_SIZE = 500;
+        for (let i = 0; i < newTasks.length; i += BATCH_SIZE) {
+          const chunk = newTasks.slice(i, i + BATCH_SIZE);
+          await prisma.task.createMany({
+            data: chunk
+          });
+        }
       }
 
       return NextResponse.json({ 
@@ -149,15 +156,24 @@ export async function POST(request: Request) {
           name,
           creatorId: userId,
           config_json: JSON.stringify(mapping),
-          tasks: {
-            create: data.map((row: any) => ({
-              county: String(row[countyKey] || 'Unknown'),
-              reference_json: JSON.stringify(row),
-              status: 'pending'
-            }))
-          }
         }
       });
+
+      // Create tasks in chunks to avoid "parameter too many" error
+      const BATCH_SIZE = 500;
+      const tasksToCreate = data.map((row: any) => ({
+        batchId: batch.id,
+        county: String(row[countyKey] || 'Unknown'),
+        reference_json: JSON.stringify(row),
+        status: 'pending'
+      }));
+
+      for (let i = 0; i < tasksToCreate.length; i += BATCH_SIZE) {
+        const chunk = tasksToCreate.slice(i, i + BATCH_SIZE);
+        await prisma.task.createMany({
+          data: chunk
+        });
+      }
 
       return NextResponse.json({ success: true, batchId: batch.id, count: data.length });
     }
