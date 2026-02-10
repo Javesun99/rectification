@@ -604,54 +604,62 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="container mx-auto p-8 max-w-6xl">
-      <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">管理员控制台</h1>
-        <div className="flex gap-2">
+    <div className="container mx-auto p-4 md:p-8 max-w-6xl">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-6 md:mb-8 gap-4">
+        <h1 className="text-2xl md:text-3xl font-bold">管理员控制台</h1>
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
             <Button
                 variant={activeTab === 'import' ? 'default' : 'outline'}
+                size="sm"
                 onClick={() => setActiveTab('import')}
+                className="flex-1 md:flex-none"
             >
                 批量导入
             </Button>
             <Button
                 variant={activeTab === 'manage' ? 'default' : 'outline'}
+                size="sm"
                 onClick={() => setActiveTab('manage')}
+                className="flex-1 md:flex-none"
             >
                 任务管理
             </Button>
             <Button
                 variant={activeTab === 'users' ? 'default' : 'outline'}
+                size="sm"
                 onClick={() => setActiveTab('users')}
                 disabled={currentUserRole !== 'superadmin'}
                 title={currentUserRole !== 'superadmin' ? '仅超级管理员可用' : ''}
+                className="flex-1 md:flex-none"
             >
                 用户管理
             </Button>
 
-            <div className="flex items-center gap-2 border-l pl-4 ml-2">
-                <span className="text-sm text-muted-foreground">
-                    欢迎您，<span className="font-semibold text-foreground">{currentUser?.username || 'Admin'}</span>
+            <div className="flex items-center gap-2 border-l pl-2 ml-2 md:pl-4 md:ml-2 w-full md:w-auto justify-end md:justify-start mt-2 md:mt-0">
+                <span className="text-xs md:text-sm text-muted-foreground truncate max-w-[100px] md:max-w-none">
+                    <span className="font-semibold text-foreground">{currentUser?.username || 'Admin'}</span>
                 </span>
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="h-8"
+                    className="h-8 px-2"
                     onClick={() => setShowChangePasswordModal(true)}
                 >
-                    修改密码
+                    <span className="hidden sm:inline">修改密码</span>
+                    <span className="sm:hidden">改密</span>
                 </Button>
                 <Button
                     variant="ghost"
                     size="sm"
-                    className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8"
+                    className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 px-2"
                     onClick={async () => {
                         await fetch('/api/auth/logout', { method: 'POST' });
                         localStorage.removeItem('user');
                         router.push('/login');
                     }}
                 >
-                    退出登录
+                    <span className="hidden sm:inline">退出登录</span>
+                    <span className="sm:hidden">退出</span>
                 </Button>
             </div>
         </div>
@@ -821,8 +829,8 @@ export default function AdminPage() {
                 </Card>
             )}
 
-            <div className="rounded-md border">
-                <table className="w-full text-sm">
+            <div className="rounded-md border overflow-x-auto">
+                <table className="w-full text-sm min-w-[600px]">
                     <thead>
                         <tr className="border-b bg-muted/50">
                             <th className="p-4 text-left font-medium">ID</th>
@@ -903,7 +911,7 @@ export default function AdminPage() {
                 <div className="space-y-4">
 
                 {/* Mode Selection */}
-                <div className="flex items-center gap-4 bg-muted/20 p-3 rounded-md">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 bg-muted/20 p-3 rounded-md">
                     <label className="flex items-center gap-2 cursor-pointer">
                         <input
                             type="radio"
@@ -1214,21 +1222,23 @@ export default function AdminPage() {
                         </div>
 
                         {/* Date Filter */}
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-muted-foreground">提交时间:</span>
-                            <input
-                                type="date"
-                                className="flex h-8 w-32 rounded-md border border-input bg-background px-2 text-xs"
-                                value={dateFilter.start}
-                                onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
-                            />
-                            <span className="text-sm text-muted-foreground">-</span>
-                            <input
-                                type="date"
-                                className="flex h-8 w-32 rounded-md border border-input bg-background px-2 text-xs"
-                                value={dateFilter.end}
-                                onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
-                            />
+                        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto mt-2 sm:mt-0">
+                            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">提交时间:</span>
+                            <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                                <input
+                                    type="date"
+                                    className="flex h-8 w-full sm:w-32 rounded-md border border-input bg-background px-2 text-xs"
+                                    value={dateFilter.start}
+                                    onChange={(e) => setDateFilter(prev => ({ ...prev, start: e.target.value }))}
+                                />
+                                <span className="text-sm text-muted-foreground">-</span>
+                                <input
+                                    type="date"
+                                    className="flex h-8 w-full sm:w-32 rounded-md border border-input bg-background px-2 text-xs"
+                                    value={dateFilter.end}
+                                    onChange={(e) => setDateFilter(prev => ({ ...prev, end: e.target.value }))}
+                                />
+                            </div>
                             <div className="flex gap-1 ml-2">
                                 <Button
                                     variant="secondary"
@@ -1255,8 +1265,8 @@ export default function AdminPage() {
                         </div>
                     </div>
 
-                    <div className="rounded-md border">
-                        <table className="w-full text-sm">
+                    <div className="rounded-md border overflow-x-auto">
+                        <table className="w-full text-sm min-w-[800px]">
                             <thead>
                                 <tr className="border-b bg-muted/50">
                                     <th className="p-4 text-left font-medium">ID</th>

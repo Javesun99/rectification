@@ -76,9 +76,9 @@ export default function BatchesContent() {
 
   return (
     <div className="container mx-auto p-4 max-w-4xl">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
             <h1 className="text-2xl font-bold">{county} - 请选择任务批次</h1>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
                 <span className="text-sm text-muted-foreground">
                     欢迎您，<span className="font-semibold text-foreground">{currentUser?.username || 'User'}</span>
                 </span>
