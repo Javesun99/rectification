@@ -26,6 +26,8 @@ RUN npm ci
 # 2. 构建阶段
 FROM node:20-alpine AS builder
 WORKDIR /app
+# 安装 OpenSSL 依赖，解决 prisma generate 在 arm64 下的警告
+RUN apk add --no-cache openssl
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 

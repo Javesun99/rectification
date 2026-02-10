@@ -18,8 +18,14 @@ export async function POST(request: Request) {
 
     const { password: _, ...userWithoutPassword } = user;
     
+    // Explicitly handle null county to undefined to match optional UserPayload type
+    const payload = {
+        ...userWithoutPassword,
+        county: userWithoutPassword.county || undefined
+    };
+    
     // Generate JWT
-    const token = await signToken(userWithoutPassword);
+    const token = await signToken(payload);
 
     // Set Cookie
     const cookieStore = await cookies();
