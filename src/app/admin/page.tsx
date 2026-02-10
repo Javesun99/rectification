@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Upload, FileSpreadsheet, Save, Trash2, Plus, RefreshCw } from 'lucide-react';
 
 export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<'import' | 'manage' | 'users'>('import');
+  const [activeTab, setActiveTab] = useState<'import' | 'manage' | 'users' | 'logs'>('import');
 
   // Import State
   const [file, setFile] = useState<File | null>(null);
@@ -125,6 +125,9 @@ export default function AdminPage() {
 
   const router = useRouter();
 
+  // Logs State
+  const [logs, setLogs] = useState<any[]>([]);
+
   useEffect(() => {
     // Check admin auth handled by middleware and fetch above
     if (activeTab === 'manage' || activeTab === 'import') {
@@ -146,6 +149,23 @@ export default function AdminPage() {
       }
     }
   }, [isAppendMode, targetBatchId, batches, headers]);
+
+  const fetchLogs = async () => {
+    if (currentUserRole !== 'superadmin') return;
+    try {
+      const res = await fetch('/api/admin/logs');
+      const data = await res.json();
+      setLogs(data.logs || []);
+    } catch (error) {
+      console.error('Failed to fetch logs', error);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'logs' && currentUserRole === 'superadmin') {
+      fetchLogs();
+    }
+  }, [activeTab, currentUserRole]);
 
   const handleExport = async (batchId?: string) => {
     setExportLoading(true);
@@ -624,16 +644,26 @@ export default function AdminPage() {
             >
                 任务管理
             </Button>
-            <Button
-                variant={activeTab === 'users' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setActiveTab('users')}
-                disabled={currentUserRole !== 'superadmin'}
-                title={currentUserRole !== 'superadmin' ? '仅超级管理员可用' : ''}
-                className="flex-1 md:flex-none"
-            >
-                用户管理
-            </Button>
+            {currentUserRole === 'superadmin' && (
+                <>
+                    <Button
+                        variant={activeTab === 'users' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setActiveTab('users')}
+                        className="flex-1 md:flex-none"
+                    >
+                        用户管理
+                    </Button>
+                    <Button
+                        variant={activeTab === 'logs' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => setActiveTab('logs')}
+                        className="flex-1 md:flex-none"
+                    >
+                        登录日志
+                    </Button>
+                </>
+            )}
 
             <div className="flex items-center gap-2 border-l pl-2 ml-2 md:pl-4 md:ml-2 w-full md:w-auto justify-end md:justify-start mt-2 md:mt-0">
                 <span className="text-xs md:text-sm text-muted-foreground truncate max-w-[100px] md:max-w-none">
@@ -867,6 +897,57 @@ export default function AdminPage() {
                                 </td>
                             </tr>
                         ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+      )}
+
+      {activeTab === 'logs' && (
+        <div className="space-y-6">
+            <div className="flex justify-between items-center">
+                <h2 className="text-xl font-semibold">登录日志 (最近100条)</h2>
+                <Button variant="outline" size="icon" onClick={fetchLogs}><RefreshCw className="w-4 h-4"/></Button>
+            </div>
+
+            <div className="rounded-md border overflow-x-auto">
+                <table className="w-full text-sm min-w-[600px]">
+                    <thead>
+                        <tr className="border-b bg-muted/50">
+                            <th className="p-4 text-left font-medium">用户</th>
+                            <th className="p-4 text-left font-medium">角色</th>
+                            <th className="p-4 text-left font-medium">县市</th>
+                            <th className="p-4 text-left font-medium">IP地址</th>
+                            <th className="p-4 text-left font-medium">设备信息</th>
+                            <th className="p-4 text-left font-medium">登录时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {logs.map((log: any) => (
+                            <tr key={log.id} className="border-b hover:bg-muted/20">
+                                <td className="p-4 font-medium">{log.user?.username || '未知'}</td>
+                                <td className="p-4">
+                                    <span className={`px-2 py-1 rounded text-xs ${
+                                        log.user?.role === 'superadmin' ? 'bg-red-100 text-red-800' :
+                                        log.user?.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                                        'bg-blue-100 text-blue-800'
+                                    }`}>
+                                        {log.user?.role || '-'}
+                                    </span>
+                                </td>
+                                <td className="p-4">{log.user?.county || '-'}</td>
+                                <td className="p-4 font-mono text-xs">{log.ip}</td>
+                                <td className="p-4 text-xs text-muted-foreground max-w-[200px] truncate" title={log.userAgent}>
+                                    {log.userAgent}
+                                </td>
+                                <td className="p-4">{new Date(log.loginAt).toLocaleString()}</td>
+                            </tr>
+                        ))}
+                        {logs.length === 0 && (
+                            <tr>
+                                <td colSpan={6} className="p-8 text-center text-muted-foreground">暂无登录记录</td>
+                            </tr>
+                        )}
                     </tbody>
                 </table>
             </div>

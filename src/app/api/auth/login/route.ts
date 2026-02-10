@@ -17,13 +17,13 @@ export async function POST(request: Request) {
     }
 
     const { password: _, ...userWithoutPassword } = user;
-    
+
     // Explicitly handle null county to undefined to match optional UserPayload type
     const payload = {
         ...userWithoutPassword,
         county: userWithoutPassword.county || undefined
     };
-    
+
     // Generate JWT
     const token = await signToken(payload);
 
@@ -31,13 +31,33 @@ export async function POST(request: Request) {
     const cookieStore = await cookies();
     cookieStore.set('token', token, {
       httpOnly: true,
-      // If using HTTP (IP address), secure: true will block the cookie. 
+      // If using HTTP (IP address), secure: true will block the cookie.
       // Only enable secure if explicitly using HTTPS or a specific env var.
-      secure: process.env.USE_HTTPS === 'true', 
+      secure: process.env.USE_HTTPS === 'true',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24, // 1 day
       path: '/',
     });
+
+    // Record Login Log
+    try {
+      const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
+      const userAgent = request.headers.get('user-agent') || 'unknown';
+
+      console.log(`[Login] Creating log for user ${user.id} from IP ${ip}`);
+
+      await prisma.loginLog.create({
+        data: {
+          userId: user.id,
+          ip: ip.split(',')[0].trim(),
+          userAgent
+        }
+      });
+      console.log(`[Login] Log created successfully`);
+    } catch (logError) {
+      console.error('Failed to record login log:', logError);
+      // Don't block login if logging fails
+    }
 
     return NextResponse.json({ success: true, user: userWithoutPassword });
   } catch (error) {

@@ -17,6 +17,16 @@ model User {
   createdAt DateTime @default(now())
   
   createdBatches ImportBatch[]
+  loginLogs      LoginLog[]
+}
+
+model LoginLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ip        String?
+  userAgent String?
+  loginAt   DateTime @default(now())
 }
 
 model ImportBatch {
