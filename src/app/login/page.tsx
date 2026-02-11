@@ -31,9 +31,10 @@ export default function LoginPage() {
         localStorage.removeItem('user');
 
         if (data.user.role === 'admin' || data.user.role === 'superadmin') {
-          router.push('/admin');
+          // Use window.location.href for hard navigation to ensure cookies and middleware state are fresh
+          window.location.href = '/admin';
         } else {
-          router.push(`/batches?county=${encodeURIComponent(data.user.county || '')}`);
+          window.location.href = `/batches?county=${encodeURIComponent(data.user.county || '')}`;
         }
       } else {
         alert(data.error || '登录失败');
