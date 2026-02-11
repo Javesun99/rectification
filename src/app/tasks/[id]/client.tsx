@@ -32,7 +32,13 @@ export default function TaskDetailContent({ id }: { id: string }) {
             const ref = JSON.parse(t.reference_json || '{}');
             Object.entries(config).forEach(([key, typeStr]) => {
               const baseType = String(typeStr).split('|')[0];
-              if (baseType === 'prefill') {
+
+              // Improved Prefill Logic:
+              // 1. Always prefill 'prefill' type fields if empty.
+              // 2. For 'text'/'date' fields, only prefill if the task hasn't been submitted yet (first open).
+              const shouldPrefill = baseType === 'prefill' || ((!t.submission_json) && ['text', 'date'].includes(baseType));
+
+              if (shouldPrefill) {
                 const current = initial[key];
                 const isEmpty =
                   current === undefined ||
