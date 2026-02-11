@@ -29,7 +29,8 @@ export default function BatchesContent() {
         }
       })
       .catch(() => {
-        router.push('/login');
+        // Auth handled by middleware, just ignore or log
+        console.log('Failed to fetch user info');
       });
 
     fetch('/api/admin/batches')
