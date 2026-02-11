@@ -51,8 +51,8 @@ export default function AdminPage() {
         }
       })
       .catch(() => {
-          // If fetch fails (401), middleware should have redirected, but just in case
-          // router.push('/login');
+        // Auth handled by middleware, ignore client-side redirect
+        console.log('Failed to fetch user info');
       });
   }, []);
 
