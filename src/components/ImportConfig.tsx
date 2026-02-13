@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Settings2, ArrowRight } from 'lucide-react';
@@ -15,35 +15,45 @@ export default function ImportConfig({ file, onParsed, onCancel }: ImportConfigP
   const [dataStartRow, setDataStartRow] = useState<number>(2);
   const [enableMerge, setEnableMerge] = useState<boolean>(false);
   const [previewData, setPreviewData] = useState<any[][]>([]);
-  const [worksheet, setWorksheet] = useState<XLSX.WorkSheet | null>(null);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [selectedSheet, setSelectedSheet] = useState<string>('');
-  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
+  const [workbook, setWorkbook] = useState<ExcelJS.Workbook | null>(null);
 
-  // Load preview immediately
   useState(() => {
     const reader = new FileReader();
-    reader.onload = (e) => {
-      const data = new Uint8Array(e.target?.result as ArrayBuffer);
-      const wb = XLSX.read(data, { type: 'array' });
+    reader.onload = async (e) => {
+      const buffer = e.target?.result as ArrayBuffer;
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buffer);
       setWorkbook(wb);
-      setSheetNames(wb.SheetNames);
-      
-      if (wb.SheetNames.length > 0) {
-        const firstSheetName = wb.SheetNames[0];
-        setSelectedSheet(firstSheetName);
-        loadSheet(wb, firstSheetName);
+
+      const names = wb.worksheets.map(ws => ws.name);
+      setSheetNames(names);
+
+      if (names.length > 0) {
+        setSelectedSheet(names[0]);
+        loadSheet(wb, names[0]);
       }
     };
     reader.readAsArrayBuffer(file);
   });
 
-  const loadSheet = (wb: XLSX.WorkBook, name: string) => {
-      const ws = wb.Sheets[name];
-      // Convert to array of arrays to show raw structure
-      const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as any[][];
-      setPreviewData(jsonData.slice(0, 10)); // Preview first 10 rows
-      setWorksheet(ws);
+  const loadSheet = (wb: ExcelJS.Workbook, name: string) => {
+    const ws = wb.getWorksheet(name);
+    if (!ws) return;
+
+    const rows: any[][] = [];
+    ws.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+      if (rowNumber <= 10) {
+        const values: any[] = [];
+        for (let c = 1; c <= ws.columnCount; c++) {
+          const cell = row.getCell(c);
+          values.push(cell.value != null ? String(cell.value) : '');
+        }
+        rows.push(values);
+      }
+    });
+    setPreviewData(rows);
   };
 
   const handleSheetChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -55,119 +65,92 @@ export default function ImportConfig({ file, onParsed, onCancel }: ImportConfigP
   };
 
   const handleParse = () => {
-    if (!worksheet) return;
+    if (!workbook) return;
+    const ws = workbook.getWorksheet(selectedSheet);
+    if (!ws) return;
 
     let finalHeaders: string[] = [];
-    
-    // Parse Headers
+
+    const getRowValues = (rowNum: number): string[] => {
+      const row = ws.getRow(rowNum);
+      const values: string[] = [];
+      for (let c = 1; c <= ws.columnCount; c++) {
+        values.push(String(row.getCell(c).value ?? '').trim());
+      }
+      return values;
+    };
+
     if (enableMerge) {
-      // Logic for merged headers: from headerRow to dataStartRow - 1
-      const headerRows = previewData.slice(headerRow - 1, dataStartRow - 1);
-      
-      // Get merge ranges from worksheet to distinguish between "Merged" and "Empty"
-      const merges = worksheet['!merges'] || [];
-      
-      // Transpose and join
-      const numCols = headerRows[0]?.length || 0;
-      let lastValues: string[] = new Array(headerRows.length).fill('');
+      const headerRows: string[][] = [];
+      for (let r = headerRow; r < dataStartRow; r++) {
+        headerRows.push(getRowValues(r));
+      }
+
+      const merges = ws.model.merges || [];
+      const mergeRanges: { s: { r: number; c: number }; e: { r: number; c: number } }[] = [];
+      merges.forEach((m: string) => {
+        const decoded = decodeMergeRange(m);
+        if (decoded) mergeRanges.push(decoded);
+      });
+
+      const numCols = ws.columnCount;
+      const lastValues: string[] = new Array(headerRows.length).fill('');
 
       for (let c = 0; c < numCols; c++) {
         const parts: string[] = [];
-        let hasOwnValue = false; 
+        let hasOwnValue = false;
 
         for (let r = 0; r < headerRows.length; r++) {
-          const rawVal = String(headerRows[r][c] || '').trim();
+          const rawVal = headerRows[r][c];
           if (rawVal) hasOwnValue = true;
         }
 
         for (let r = 0; r < headerRows.length; r++) {
-          const rawVal = String(headerRows[r][c] || '').trim();
-          
-          if (rawVal) {
-             lastValues[r] = rawVal;
-             parts.push(rawVal);
-          } else {
-             // Check if this cell is actually part of a merge range that started to the left
-             // Current cell coordinates (0-based relative to sheet):
-             // Row = (headerRow - 1) + r
-             // Col = c
-             const absRow = (headerRow - 1) + r;
-             const absCol = c;
-             
-             const isMerged = merges.some((range: XLSX.Range) => {
-                 // Check if current cell is inside a merge range
-                 // AND that range started strictly to the left (range.s.c < absCol)
-                 // AND covers this row
-                 return absRow >= range.s.r && absRow <= range.e.r && 
-                        absCol >= range.s.c && absCol <= range.e.c &&
-                        range.s.c < absCol; // Ensure it's a horizontal merge from left
-             });
+          const rawVal = headerRows[r][c];
 
-             if (isMerged && lastValues[r]) {
-                 parts.push(lastValues[r]);
-             } else {
-                 // Not merged, so it's a genuine empty parent header.
-                 // Do not inherit.
-                 // This solves the "unrelated column" issue.
-             }
+          if (rawVal) {
+            lastValues[r] = rawVal;
+            parts.push(rawVal);
+          } else {
+            const absRow = (headerRow - 1) + r;
+            const absCol = c;
+
+            const isMerged = mergeRanges.some(range =>
+              absRow >= range.s.r && absRow <= range.e.r &&
+              absCol >= range.s.c && absCol <= range.e.c &&
+              range.s.c < absCol
+            );
+
+            if (isMerged && lastValues[r]) {
+              parts.push(lastValues[r]);
+            }
           }
         }
-        
+
         const headerName = parts.join('_');
         if (headerName) {
-            finalHeaders.push(headerName);
+          finalHeaders.push(headerName);
         } else if (hasOwnValue) {
-            finalHeaders.push(`Column_${c + 1}`);
+          finalHeaders.push(`Column_${c + 1}`);
         }
       }
 
-      // Fix for duplicate keys react warning:
-      // Ensure all headers are unique.
-      const uniqueHeaders: string[] = [];
-      const counts: Record<string, number> = {};
-      
-      finalHeaders.forEach(h => {
-          if (counts[h]) {
-              counts[h]++;
-              uniqueHeaders.push(`${h}_${counts[h]}`);
-          } else {
-              counts[h] = 1;
-              uniqueHeaders.push(h);
-          }
-      });
-      finalHeaders = uniqueHeaders;
+      finalHeaders = deduplicateHeaders(finalHeaders);
     } else {
-      // Single header row
-      let rawHeaders = previewData[headerRow - 1].map((h: any, i: number) => 
-        String(h || '').trim() || `Column_${i + 1}`
-      );
-
-      // Fix for duplicate keys react warning (also for single row)
-      const uniqueHeaders: string[] = [];
-      const counts: Record<string, number> = {};
-      
-      rawHeaders.forEach(h => {
-          if (counts[h]) {
-              counts[h]++;
-              uniqueHeaders.push(`${h}_${counts[h]}`);
-          } else {
-              counts[h] = 1;
-              uniqueHeaders.push(h);
-          }
-      });
-      finalHeaders = uniqueHeaders;
+      let rawHeaders = getRowValues(headerRow).map((h, i) => h || `Column_${i + 1}`);
+      finalHeaders = deduplicateHeaders(rawHeaders);
     }
 
-    // Parse Data
-    // We re-parse using XLSX utils with range option for safety
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1');
-    range.s.r = dataStartRow - 1; // Start from data row (0-based)
-    
-    // Custom data extraction to map to our calculated headers
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
-      header: finalHeaders, 
-      range: range,
-      defval: ''
+    const jsonData: Record<string, any>[] = [];
+    ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+      if (rowNumber < dataStartRow) return;
+
+      const obj: Record<string, any> = {};
+      for (let c = 0; c < finalHeaders.length; c++) {
+        const cell = row.getCell(c + 1);
+        obj[finalHeaders[c]] = cell.value != null ? String(cell.value) : '';
+      }
+      jsonData.push(obj);
     });
 
     onParsed(finalHeaders, jsonData);
@@ -181,7 +164,6 @@ export default function ImportConfig({ file, onParsed, onCancel }: ImportConfigP
           <h3 className="font-semibold text-lg">Excel 解析配置</h3>
         </div>
         
-        {/* Sheet Selection */}
         {sheetNames.length > 1 && (
           <div className="mb-4">
             <label className="text-sm font-medium">选择工作表 (Sheet)</label>
@@ -229,7 +211,6 @@ export default function ImportConfig({ file, onParsed, onCancel }: ImportConfigP
           </div>
         </div>
 
-        {/* Preview Area */}
         <div className="border rounded-md overflow-x-auto bg-muted/10 p-2">
           <p className="text-xs text-muted-foreground mb-2">原始数据预览 (前10行):</p>
           <table className="w-full text-xs border-collapse">
@@ -265,4 +246,36 @@ export default function ImportConfig({ file, onParsed, onCancel }: ImportConfigP
       </CardContent>
     </Card>
   );
+}
+
+function decodeMergeRange(ref: string) {
+  const match = ref.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+  if (!match) return null;
+  return {
+    s: { r: parseInt(match[2]) - 1, c: colToIndex(match[1]) },
+    e: { r: parseInt(match[4]) - 1, c: colToIndex(match[3]) }
+  };
+}
+
+function colToIndex(col: string): number {
+  let idx = 0;
+  for (let i = 0; i < col.length; i++) {
+    idx = idx * 26 + (col.charCodeAt(i) - 64);
+  }
+  return idx - 1;
+}
+
+function deduplicateHeaders(headers: string[]): string[] {
+  const result: string[] = [];
+  const counts: Record<string, number> = {};
+  headers.forEach(h => {
+    if (counts[h]) {
+      counts[h]++;
+      result.push(`${h}_${counts[h]}`);
+    } else {
+      counts[h] = 1;
+      result.push(h);
+    }
+  });
+  return result;
 }
