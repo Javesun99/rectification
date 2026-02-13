@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ExcelJS from 'exceljs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -13,6 +14,7 @@ export default function TasksContent() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [exportLoading, setExportLoading] = useState(false);
+  const [fillLoading, setFillLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'submitted'>('all');
   const router = useRouter();
@@ -58,6 +60,69 @@ export default function TasksContent() {
     }
   };
 
+  const handleBatchFill = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !batchId) return;
+    e.target.value = '';
+
+    setFillLoading(true);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buffer);
+      const ws = wb.worksheets[0];
+      if (!ws) throw new Error('工作表为空');
+
+      const headerRow = ws.getRow(1);
+      const headers: string[] = [];
+      headerRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+        headers[colNumber - 1] = String(cell.value ?? '');
+      });
+
+      const rows: Record<string, any>[] = [];
+      ws.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+        if (rowNumber === 1) return;
+        const obj: Record<string, any> = {};
+        headers.forEach((h, i) => {
+          const cell = row.getCell(i + 1);
+          if (cell.value instanceof Date) {
+            const d = cell.value;
+            obj[h] = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+          } else {
+            obj[h] = cell.value != null ? String(cell.value) : '';
+          }
+        });
+        rows.push(obj);
+      });
+
+      if (rows.length === 0) {
+        alert('Excel 中没有数据行');
+        return;
+      }
+
+      const res = await fetch('/api/tasks/batch-fill', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batchId: Number(batchId), rows })
+      });
+      const json = await res.json();
+
+      if (json.success) {
+        let msg = `批量回填完成！成功更新 ${json.updated} 条任务`;
+        if (json.skipped > 0) msg += `，跳过 ${json.skipped} 条`;
+        if (json.errors && json.errors.length > 0) msg += `\n\n提示：\n${json.errors.join('\n')}`;
+        alert(msg);
+        window.location.reload();
+      } else {
+        alert(json.error || '回填失败');
+      }
+    } catch (err) {
+      alert('文件解析失败，请确保上传的是有效的 Excel 文件');
+    } finally {
+      setFillLoading(false);
+    }
+  };
+
   if (!county) return <div>请先登录</div>;
   if (loading) return <div>加载中...</div>;
 
@@ -67,6 +132,14 @@ export default function TasksContent() {
 
   // Get batch name if available (from first task)
   const batchName = tasks.length > 0 ? tasks[0].batch.name : '任务列表';
+
+  const hasImageField = (() => {
+    if (tasks.length === 0) return false;
+    try {
+      const cfg = JSON.parse(tasks[0].batch.config_json || '{}');
+      return Object.values(cfg).some((v: any) => String(v).split('|')[0] === 'image');
+    } catch { return false; }
+  })();
 
   // Filter and Sort Tasks
   const filteredTasks = tasks.filter(task => {
@@ -103,9 +176,30 @@ export default function TasksContent() {
                     </Button>
                     <h1 className="text-xl font-bold truncate max-w-[200px] sm:max-w-md">{county} - {batchName}</h1>
                 </div>
-                <Button onClick={handleExport} disabled={exportLoading} size="sm">
-                    {exportLoading ? '导出...' : '导出'}
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button onClick={handleExport} disabled={exportLoading} size="sm">
+                        {exportLoading ? '导出...' : '导出'}
+                    </Button>
+                    {batchId && !hasImageField && (
+                        <label>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={fillLoading}
+                                onClick={() => document.getElementById('batch-fill-input')?.click()}
+                            >
+                                {fillLoading ? '回填中...' : '上传回填'}
+                            </Button>
+                            <input
+                                id="batch-fill-input"
+                                type="file"
+                                accept=".xlsx,.xls"
+                                className="hidden"
+                                onChange={handleBatchFill}
+                            />
+                        </label>
+                    )}
+                </div>
             </div>
 
             {/* Search and Filter Bar */}

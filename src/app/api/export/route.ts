@@ -52,6 +52,7 @@ export async function GET(request: Request) {
     const sub = task.submission_json ? JSON.parse(task.submission_json) : {};
 
     const row: Record<string, any> = {};
+    row['__TaskID'] = task.id;
 
     if (exportKeys.length > 0) {
       exportKeys.forEach(k => {
@@ -72,8 +73,8 @@ export async function GET(request: Request) {
 
   if (exportData.length > 0) {
     const finalColumns = exportKeys.length > 0
-      ? [...exportKeys, ...systemColumns]
-      : Array.from(new Set(exportData.flatMap(r => Object.keys(r))));
+      ? ['__TaskID', ...exportKeys, ...systemColumns]
+      : ['__TaskID', ...Array.from(new Set(exportData.flatMap(r => Object.keys(r)).filter(k => k !== '__TaskID')))];
 
     worksheet.columns = finalColumns.map(key => ({
       header: key,
