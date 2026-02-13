@@ -2,6 +2,17 @@ import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import ExcelJS from 'exceljs';
 
+function formatDateString(val: any): any {
+  if (typeof val !== 'string') return val;
+  if (/^\w{3} \w{3} \d{2} \d{4} /.test(val)) {
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) {
+      return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+    }
+  }
+  return val;
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const county = searchParams.get('county');
@@ -115,11 +126,10 @@ export async function GET(request: Request) {
     // Explicitly adding rows is safer.
 
     exportData.forEach(row => {
-        // Sanitize data to prevent formula injection
         const safeRow: any = {};
         Object.keys(row).forEach(k => {
             let val = (row as any)[k];
-            // If value starts with '=', prepend a quote to force it as string
+            val = formatDateString(val);
             if (typeof val === 'string' && val.startsWith('=')) {
                 val = "'" + val;
             }

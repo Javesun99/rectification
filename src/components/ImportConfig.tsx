@@ -4,6 +4,25 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Settings2, ArrowRight } from 'lucide-react';
 
+function formatCellValue(cell: ExcelJS.Cell): string {
+  const val = cell.value;
+  if (val == null) return '';
+  if (val instanceof Date) {
+    const y = val.getFullYear();
+    const m = val.getMonth() + 1;
+    const d = val.getDate();
+    return `${y}/${m}/${d}`;
+  }
+  if (typeof val === 'object' && 'richText' in val) {
+    return (val as ExcelJS.CellRichTextValue).richText.map(r => r.text).join('');
+  }
+  if (typeof val === 'object' && 'formula' in val) {
+    const f = val as ExcelJS.CellFormulaValue;
+    return f.result != null ? String(f.result) : '';
+  }
+  return String(val);
+}
+
 interface ImportConfigProps {
   file: File;
   onParsed: (headers: string[], data: any[]) => void;
@@ -48,7 +67,7 @@ export default function ImportConfig({ file, onParsed, onCancel }: ImportConfigP
         const values: any[] = [];
         for (let c = 1; c <= ws.columnCount; c++) {
           const cell = row.getCell(c);
-          values.push(cell.value != null ? String(cell.value) : '');
+          values.push(formatCellValue(cell));
         }
         rows.push(values);
       }
@@ -148,7 +167,7 @@ export default function ImportConfig({ file, onParsed, onCancel }: ImportConfigP
       const obj: Record<string, any> = {};
       for (let c = 0; c < finalHeaders.length; c++) {
         const cell = row.getCell(c + 1);
-        obj[finalHeaders[c]] = cell.value != null ? String(cell.value) : '';
+        obj[finalHeaders[c]] = formatCellValue(cell);
       }
       jsonData.push(obj);
     });
