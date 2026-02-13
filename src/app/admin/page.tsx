@@ -1294,7 +1294,14 @@ export default function AdminPage() {
                                     let summary = '';
                                     try {
                                         const ref = JSON.parse(task.reference_json || '{}');
-                                        summary = Object.values(ref).slice(0, 2).join(', ');
+                                        const currentBatch = batches.find(b => b.id === viewingBatchId);
+                                        const config = currentBatch ? JSON.parse(currentBatch.config_json || '{}') : {};
+                                        const fixedKeys = Object.keys(config).filter(k => config[k] === 'fixed' || config[k].startsWith('fixed'));
+                                        if (fixedKeys.length > 0) {
+                                            summary = fixedKeys.slice(0, 2).map(k => ref[k]).filter(Boolean).join(', ');
+                                        } else {
+                                            summary = Object.values(ref).slice(0, 2).join(', ');
+                                        }
                                     } catch (e) {
                                         summary = '数据解析错误';
                                     }
