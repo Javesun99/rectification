@@ -222,8 +222,7 @@ export default function AdminPage() {
   };
 
   const fetchUsers = async () => {
-    // Only superadmin can manage users
-    if (currentUserRole !== 'superadmin') return;
+    if (currentUserRole !== 'superadmin' && currentUserRole !== 'admin') return;
 
     try {
       const res = await fetch('/api/admin/users');
@@ -235,7 +234,7 @@ export default function AdminPage() {
   };
 
   useEffect(() => {
-    if (activeTab === 'users' && currentUserRole === 'superadmin') {
+    if (activeTab === 'users' && (currentUserRole === 'superadmin' || currentUserRole === 'admin')) {
       fetchUsers();
     }
   }, [activeTab, currentUserRole]);
@@ -545,25 +544,25 @@ export default function AdminPage() {
             >
                 任务管理
             </Button>
+            {(currentUserRole === 'superadmin' || currentUserRole === 'admin') && (
+                <Button
+                    variant={activeTab === 'users' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setActiveTab('users')}
+                    className="flex-1 md:flex-none"
+                >
+                    用户管理
+                </Button>
+            )}
             {currentUserRole === 'superadmin' && (
-                <>
-                    <Button
-                        variant={activeTab === 'users' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setActiveTab('users')}
-                        className="flex-1 md:flex-none"
-                    >
-                        用户管理
-                    </Button>
-                    <Button
-                        variant={activeTab === 'logs' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setActiveTab('logs')}
-                        className="flex-1 md:flex-none"
-                    >
-                        登录日志
-                    </Button>
-                </>
+                <Button
+                    variant={activeTab === 'logs' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setActiveTab('logs')}
+                    className="flex-1 md:flex-none"
+                >
+                    登录日志
+                </Button>
             )}
 
             <div className="flex items-center gap-2 border-l pl-2 ml-2 md:pl-4 md:ml-2 w-full md:w-auto justify-end md:justify-start mt-2 md:mt-0">
@@ -734,10 +733,15 @@ export default function AdminPage() {
                                     className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm mt-1"
                                     value={newUserData.role}
                                     onChange={e => setNewUserData({...newUserData, role: e.target.value})}
+                                    disabled={currentUserRole === 'admin'}
                                 >
                                     <option value="user">普通用户 (User)</option>
-                                    <option value="admin">管理员 (Admin)</option>
-                                    <option value="superadmin">超级管理员 (Super Admin)</option>
+                                    {currentUserRole === 'superadmin' && (
+                                        <>
+                                            <option value="admin">管理员 (Admin)</option>
+                                            <option value="superadmin">超级管理员 (Super Admin)</option>
+                                        </>
+                                    )}
                                 </select>
                             </div>
                             {newUserData.role === 'user' && (
@@ -789,12 +793,16 @@ export default function AdminPage() {
                                 <td className="p-4">{user.county || '-'}</td>
                                 <td className="p-4"><FormattedDate date={user.createdAt} mode="date" /></td>
                                 <td className="p-4">
-                                    <Button variant="outline" size="sm" className="mr-2" onClick={() => setResetPasswordId(user.id)}>
-                                        重置密码
-                                    </Button>
-                                    <Button variant="destructive" size="sm" onClick={() => handleDeleteUser(user.id)}>
-                                        <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                    {(currentUserRole === 'superadmin' || (currentUserRole === 'admin' && user.role === 'user')) && (
+                                        <>
+                                            <Button variant="outline" size="sm" className="mr-2" onClick={() => setResetPasswordId(user.id)}>
+                                                重置密码
+                                            </Button>
+                                            <Button variant="destructive" size="sm" onClick={() => handleDeleteUser(user.id)}>
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </>
+                                    )}
                                 </td>
                             </tr>
                         ))}

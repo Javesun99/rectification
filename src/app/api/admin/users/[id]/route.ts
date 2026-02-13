@@ -9,8 +9,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     const token = cookieStore.get('token')?.value;
     const user = token ? await verifyToken(token) : null;
 
-    if (!user || (user as any).role !== 'superadmin') {
-      return NextResponse.json({ error: 'Unauthorized: Only Superadmin can delete users' }, { status: 403 });
+    if (!user || (user.role !== 'superadmin' && user.role !== 'admin')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     const { id } = await params;
@@ -18,6 +18,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
 
     if (targetId === Number(user.id)) {
       return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 });
+    }
+
+    if (user.role === 'admin') {
+      const targetUser = await prisma.user.findUnique({ where: { id: targetId } });
+      if (!targetUser || targetUser.role !== 'user') {
+        return NextResponse.json({ error: '管理员只能删除普通用户' }, { status: 403 });
+      }
     }
 
     await prisma.user.delete({
@@ -50,58 +57,43 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     }
 
     const currentUserId = Number(currentUser.id);
-    const currentUserRole = (currentUser as any).role;
+    const currentUserRole = currentUser.role;
 
-    // Logic:
-    // 1. Superadmin can reset anyone's password (no oldPassword needed).
-    // 2. User can change their own password (oldPassword REQUIRED).
-    
     if (currentUserRole === 'superadmin') {
-       // Superadmin mode
-       // If updating self, technically should require old password? 
-       // But usually superadmin can override. 
-       // However, frontend for "Change Password" (Self) sends oldPassword.
-       // Frontend for "Reset Password" (Manage) does NOT send oldPassword.
-       
-       // If it is self-update, let's enforce oldPassword if provided, or rely on frontend?
-       // Let's stick to: If oldPassword is provided, verify it (Self Change).
-       // If NOT provided, assume Force Reset (Superadmin only).
-       
-       if (targetId !== currentUserId && !oldPassword) {
-           // Force Reset by Superadmin on another user -> OK
-       } else if (targetId === currentUserId) {
-           // Self change by Superadmin
-           // If they use the "Change Password" modal, oldPassword is sent.
-           // If they use the "Reset Password" modal on themselves (weird but possible), oldPassword might not be sent.
-           // Let's require oldPassword for self-change to be safe, unless we want to allow superadmin to reset themselves without old password (dangerous if session hijacked).
-           // But for now, let's follow the provided params.
-           
-           if (oldPassword) {
-                const dbUser = await prisma.user.findUnique({ where: { id: targetId } });
-                if (!dbUser || dbUser.password !== oldPassword) {
-                    return NextResponse.json({ error: '原密码错误' }, { status: 400 });
-                }
-           }
-       }
-    } else {
-        // Regular Admin or User
-        // Can ONLY change own password
-        if (targetId !== currentUserId) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-        }
-        
-        // Must provide old password
-        if (!oldPassword) {
-            return NextResponse.json({ error: '请提供原密码' }, { status: 400 });
-        }
-        
+      if (targetId === currentUserId && oldPassword) {
         const dbUser = await prisma.user.findUnique({ where: { id: targetId } });
         if (!dbUser || dbUser.password !== oldPassword) {
-            return NextResponse.json({ error: '原密码错误' }, { status: 400 });
+          return NextResponse.json({ error: '原密码错误' }, { status: 400 });
         }
+      }
+    } else if (currentUserRole === 'admin') {
+      if (targetId === currentUserId) {
+        if (!oldPassword) {
+          return NextResponse.json({ error: '请提供原密码' }, { status: 400 });
+        }
+        const dbUser = await prisma.user.findUnique({ where: { id: targetId } });
+        if (!dbUser || dbUser.password !== oldPassword) {
+          return NextResponse.json({ error: '原密码错误' }, { status: 400 });
+        }
+      } else {
+        const targetUser = await prisma.user.findUnique({ where: { id: targetId } });
+        if (!targetUser || targetUser.role !== 'user') {
+          return NextResponse.json({ error: '管理员只能重置普通用户密码' }, { status: 403 });
+        }
+      }
+    } else {
+      if (targetId !== currentUserId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+      if (!oldPassword) {
+        return NextResponse.json({ error: '请提供原密码' }, { status: 400 });
+      }
+      const dbUser = await prisma.user.findUnique({ where: { id: targetId } });
+      if (!dbUser || dbUser.password !== oldPassword) {
+        return NextResponse.json({ error: '原密码错误' }, { status: 400 });
+      }
     }
 
-    // Perform Update
     await prisma.user.update({
       where: { id: targetId },
       data: { password }

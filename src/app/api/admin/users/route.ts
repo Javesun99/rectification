@@ -1,9 +1,22 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { verifyToken } from '@/lib/auth';
+import { cookies } from 'next/headers';
 
 export async function GET() {
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    const currentUser = token ? await verifyToken(token) : null;
+
+    if (!currentUser || (currentUser.role !== 'superadmin' && currentUser.role !== 'admin')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    const where = currentUser.role === 'admin' ? { role: 'user' } : {};
+
     const users = await prisma.user.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -21,11 +34,23 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get('token')?.value;
+    const currentUser = token ? await verifyToken(token) : null;
+
+    if (!currentUser || (currentUser.role !== 'superadmin' && currentUser.role !== 'admin')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
     const body = await request.json();
     const { username, password, role, county } = body;
 
     if (!username || !password) {
       return NextResponse.json({ error: 'Username and password required' }, { status: 400 });
+    }
+
+    if (currentUser.role === 'admin' && role !== 'user') {
+      return NextResponse.json({ error: '管理员只能创建普通用户' }, { status: 403 });
     }
 
     const existing = await prisma.user.findUnique({ where: { username } });
@@ -36,7 +61,7 @@ export async function POST(request: Request) {
     const user = await prisma.user.create({
       data: {
         username,
-        password, // Note: In production, hash this!
+        password,
         role: role || 'user',
         county
       }
